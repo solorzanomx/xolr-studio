@@ -57,7 +57,14 @@ onBeforeUnmount(() => {
 
 // ── Scenes ─────────────────────────────────────────────────────
 const showSceneForm = ref(false)
+const editingScene  = ref(null)
+
 const sceneForm = useForm({
+    title: '', description: '', location_id: null,
+    time_of_day: 'unspecified', mood: 'calm',
+})
+
+const editSceneForm = useForm({
     title: '', description: '', location_id: null,
     time_of_day: 'unspecified', mood: 'calm',
 })
@@ -68,9 +75,25 @@ function storeScene() {
     })
 }
 
+function openEditScene(scene) {
+    editingScene.value          = scene.id
+    editSceneForm.title         = scene.title ?? ''
+    editSceneForm.description   = scene.description ?? ''
+    editSceneForm.location_id   = scene.location_id ?? null
+    editSceneForm.time_of_day   = scene.time_of_day
+    editSceneForm.mood          = scene.mood
+}
+
+function updateScene() {
+    editSceneForm.put(`/scenes/${editingScene.value}`, {
+        preserveScroll: true,
+        onSuccess: () => { editingScene.value = null; editSceneForm.reset() },
+    })
+}
+
 function deleteScene(id) {
     if (!confirm('¿Eliminar escena?')) return
-    router.delete(`/scenes/${id}`)
+    router.delete(`/scenes/${id}`, { preserveScroll: true })
 }
 
 // ── Shots ──────────────────────────────────────────────────────
@@ -305,9 +328,60 @@ const epStatusLabel = {
                         <button @click="activeShotForm = activeShotForm === scene.id ? null : scene.id" class="text-xs text-amber hover:underline ml-2">
                             + shot
                         </button>
+                        <button @click="openEditScene(scene)" class="text-text-muted hover:text-amber transition-colors">
+                            <Pencil class="w-3.5 h-3.5" />
+                        </button>
                         <button @click="deleteScene(scene.id)" class="text-text-muted hover:text-danger transition-colors">
                             <Trash2 class="w-3.5 h-3.5" />
                         </button>
+                    </div>
+
+                    <!-- Scene edit form -->
+                    <div v-if="editingScene === scene.id" class="px-4 py-3 border-b border-border bg-surface-0 space-y-2">
+                        <p class="text-xs font-medium text-amber">Editando escena</p>
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="block text-xs text-text-muted mb-1">Título</label>
+                                <input v-model="editSceneForm.title" type="text" class="w-full bg-surface-2 border border-border rounded px-2 py-1.5 text-xs text-text-primary focus:outline-none focus:border-amber transition-colors" />
+                            </div>
+                            <div>
+                                <label class="block text-xs text-text-muted mb-1">Locación</label>
+                                <select v-model="editSceneForm.location_id" class="w-full bg-surface-2 border border-border rounded px-2 py-1.5 text-xs text-text-primary focus:outline-none focus:border-amber transition-colors">
+                                    <option :value="null">Sin locación</option>
+                                    <option v-for="loc in locations" :key="loc.id" :value="loc.id">{{ loc.name }}</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="block text-xs text-text-muted mb-1">Momento del día</label>
+                                <select v-model="editSceneForm.time_of_day" class="w-full bg-surface-2 border border-border rounded px-2 py-1.5 text-xs text-text-primary focus:outline-none focus:border-amber transition-colors">
+                                    <option value="morning">Mañana</option>
+                                    <option value="day">Día</option>
+                                    <option value="golden_hour">Hora dorada</option>
+                                    <option value="night">Noche</option>
+                                    <option value="unspecified">Sin especificar</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-xs text-text-muted mb-1">Mood</label>
+                                <select v-model="editSceneForm.mood" class="w-full bg-surface-2 border border-border rounded px-2 py-1.5 text-xs text-text-primary focus:outline-none focus:border-amber transition-colors">
+                                    <option value="calm">Calma</option>
+                                    <option value="tense">Tensión</option>
+                                    <option value="action">Acción</option>
+                                    <option value="dramatic">Dramático</option>
+                                    <option value="mysterious">Misterioso</option>
+                                    <option value="romantic">Romántico</option>
+                                    <option value="comedic">Cómico</option>
+                                    <option value="horror">Terror</option>
+                                    <option value="other">Otro</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="flex gap-2 pt-1">
+                            <button @click="updateScene" :disabled="editSceneForm.processing" class="px-3 py-1 bg-amber text-surface-0 text-xs font-semibold rounded hover:bg-amber/90 disabled:opacity-50 transition-colors">Guardar</button>
+                            <button @click="editingScene = null; editSceneForm.reset()" class="text-xs text-text-muted hover:text-text-primary transition-colors">Cancelar</button>
+                        </div>
                     </div>
 
                     <!-- Shot form -->
