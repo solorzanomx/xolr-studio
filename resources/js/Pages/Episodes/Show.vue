@@ -5,8 +5,6 @@ import AppLayout from '@/Layouts/AppLayout.vue'
 import { ChevronLeft, Pencil, FileText, Camera, Plus, Trash2, Image, Video, Mic } from '@lucide/vue'
 import { useEditor, EditorContent } from '@tiptap/vue-3'
 import StarterKit from '@tiptap/starter-kit'
-import axios from 'axios'
-
 const props = defineProps({
     episode: Object,
     locations: Array,
@@ -15,8 +13,12 @@ const props = defineProps({
 const activeTab = ref('info')
 
 // ── Script editor ──────────────────────────────────────────────
-const saveStatus = ref('saved') // 'saved' | 'saving' | 'unsaved'
-let autoSaveTimer = null
+const saveStatus = ref('saved') // 'saved' | 'saving' | 'unsaved' | 'error'
+const saveError  = ref('')
+let autoSaveTimer    = null
+let periodicTimer    = null
+
+const scriptForm = useForm({ script: '' })
 
 const editor = useEditor({
     content: props.episode.script ?? '',
@@ -24,24 +26,32 @@ const editor = useEditor({
     onUpdate: () => {
         saveStatus.value = 'unsaved'
         clearTimeout(autoSaveTimer)
-        autoSaveTimer = setTimeout(saveScript, 30000)
+        autoSaveTimer = setTimeout(saveScript, 5000)
     },
 })
 
-async function saveScript() {
+function saveScript() {
+    if (saveStatus.value === 'saving') return
     saveStatus.value = 'saving'
-    try {
-        await axios.put(`/episodes/${props.episode.id}/script`, {
-            script: editor.value?.getHTML() ?? '',
-        })
-        saveStatus.value = 'saved'
-    } catch {
-        saveStatus.value = 'unsaved'
-    }
+    saveError.value  = ''
+    scriptForm.script = editor.value?.getHTML() ?? ''
+    scriptForm.put(`/episodes/${props.episode.id}/script`, {
+        preserveState:  true,
+        preserveScroll: true,
+        onSuccess: () => { saveStatus.value = 'saved' },
+        onError:   (e) => { saveStatus.value = 'error'; saveError.value = Object.values(e)[0] ?? 'Error al guardar' },
+        onFinish:  () => { if (saveStatus.value === 'saving') saveStatus.value = 'unsaved' },
+    })
 }
+
+// Guardar cada 60 segundos aunque se siga escribiendo
+periodicTimer = setInterval(() => {
+    if (saveStatus.value === 'unsaved') saveScript()
+}, 60000)
 
 onBeforeUnmount(() => {
     clearTimeout(autoSaveTimer)
+    clearInterval(periodicTimer)
     editor.value?.destroy()
 })
 
@@ -164,12 +174,13 @@ const epStatusLabel = {
         <!-- SCRIPT TAB -->
         <div v-if="activeTab === 'script'">
             <div class="flex items-center justify-between mb-3">
-                <p class="text-xs text-text-muted">Editor de script — autoguardado cada 30 seg</p>
+                <p class="text-xs text-text-muted">Autoguardado a los 5s de parar de escribir · cada 60s mientras escribes</p>
                 <div class="flex items-center gap-3">
-                    <span :class="['text-xs font-mono', saveStatus === 'saved' ? 'text-success' : saveStatus === 'saving' ? 'text-amber' : 'text-text-muted']">
-                        {{ saveStatus === 'saved' ? 'Guardado' : saveStatus === 'saving' ? 'Guardando...' : 'Sin guardar' }}
-                    </span>
-                    <button @click="saveScript" class="px-3 py-1.5 bg-amber text-surface-0 text-xs font-semibold rounded-lg hover:bg-amber/90 transition-colors">
+                    <span v-if="saveStatus === 'error'" class="text-xs font-mono text-danger" :title="saveError">Error al guardar</span>
+                    <span v-else-if="saveStatus === 'saving'" class="text-xs font-mono text-amber animate-pulse">Guardando...</span>
+                    <span v-else-if="saveStatus === 'saved'" class="text-xs font-mono text-success">✓ Guardado</span>
+                    <span v-else class="text-xs font-mono text-text-muted">Sin guardar</span>
+                    <button @click="saveScript" :disabled="scriptForm.processing" class="px-3 py-1.5 bg-amber text-surface-0 text-xs font-semibold rounded-lg hover:bg-amber/90 disabled:opacity-50 transition-colors">
                         Guardar ahora
                     </button>
                 </div>
