@@ -29,6 +29,7 @@ use App\Http\Controllers\Production\ScriptGeneratorController;
 use App\Http\Controllers\Intelligence\IntelligenceController;
 use App\Http\Controllers\Publishing\ExportController;
 use App\Http\Controllers\Publishing\PrintController;
+use App\Http\Controllers\Budget\BudgetController;
 use App\Http\Controllers\Social\CalendarController;
 use App\Http\Controllers\Analytics\AnalyticsController;
 use Illuminate\Support\Facades\Route;
@@ -143,6 +144,12 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
     // Analytics
     Route::get('/analytics', [AnalyticsController::class, 'index'])->name('analytics');
     Route::post('/analytics/sync', [AnalyticsController::class, 'syncNow'])->name('analytics.sync');
+
+    // Budget
+    Route::get('/budget', [BudgetController::class, 'index'])->name('budget');
+    Route::put('/projects/{project}/budget', [BudgetController::class, 'updateBudget'])->name('projects.budget.update');
+    Route::post('/projects/{project}/budget/sync', [BudgetController::class, 'syncMonth'])->name('projects.budget.sync');
+    Route::get('/projects/{project}/budget/export', [BudgetController::class, 'exportCsv'])->name('projects.budget.export');
 
     // Publishing Engine
     Route::get('/projects/{project}/publishing', [ExportController::class, 'index'])->name('projects.publishing');

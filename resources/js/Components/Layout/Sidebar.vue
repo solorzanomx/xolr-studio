@@ -33,6 +33,7 @@ const navSections = [
             { label: 'Content Machine', href: '/content-machine', icon: 'lightbulb' },
             { label: 'Shots', href: '/shots', icon: 'camera' },
             { label: 'Renders', href: '/renders', icon: 'image' },
+            { label: 'Budget', href: '/budget', icon: 'dollar-sign' },
         ],
     },
     {
