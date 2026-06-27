@@ -72,6 +72,14 @@ return [
             'video'   => env('RUNPOD_ENDPOINT_VIDEO'),
             'upscale' => env('RUNPOD_ENDPOINT_UPSCALE'),
         ],
+        // Nombres de modelo tal como aparecen en el endpoint ComfyUI
+        'models' => [
+            'schnell' => env('RUNPOD_MODEL_SCHNELL', 'flux1-schnell-fp8.safetensors'),
+            'dev'     => env('RUNPOD_MODEL_DEV',     'flux1-dev-fp8.safetensors'),
+            'clip_l'  => env('RUNPOD_MODEL_CLIP_L',  'clip_l.safetensors'),
+            'clip_t5' => env('RUNPOD_MODEL_CLIP_T5', 't5xxl_fp8_e4m3fn.safetensors'),
+            'vae'     => env('RUNPOD_MODEL_VAE',      'ae.safetensors'),
+        ],
     ],
 
     'instagram' => [

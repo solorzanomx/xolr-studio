@@ -42,10 +42,11 @@ class AppServiceProvider extends ServiceProvider
 
         $this->app->singleton(RenderFarmContract::class, function (): RunPodAdapter {
             return new RunPodAdapter(
-                apiKey: config('services.runpod.api_key', ''),
-                endpoints: config('services.runpod.endpoints', []),
+                apiKey:        config('services.runpod.api_key', ''),
+                endpoints:     config('services.runpod.endpoints', []),
                 webhookSecret: config('services.runpod.webhook_secret'),
-                mockMode: config('services.runpod.mock_mode', false),
+                models:        config('services.runpod.models', []),
+                mockMode:      config('services.runpod.mock_mode', false),
             );
         });
     }

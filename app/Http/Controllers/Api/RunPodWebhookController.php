@@ -7,20 +7,20 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Jobs\SubmitRenderJob;
 use App\Models\Render;
+use App\Services\RenderFarm\RunPodAdapter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\Response;
 
 class RunPodWebhookController extends Controller
 {
+    public function __construct(private readonly RunPodAdapter $adapter) {}
+
     public function __invoke(Request $request): JsonResponse
     {
         if (! $this->verifySignature($request)) {
-            Log::warning('RunPod webhook: firma HMAC inválida', [
-                'ip' => $request->ip(),
-            ]);
+            Log::warning('RunPod webhook: firma HMAC inválida', ['ip' => $request->ip()]);
             return response()->json(['error' => 'Unauthorized'], Response::HTTP_UNAUTHORIZED);
         }
 
@@ -37,11 +37,9 @@ class RunPodWebhookController extends Controller
         $render = Render::where('job_id', $jobId)->first();
 
         if (! $render) {
-            // Job válido pero no conocemos el render (puede ser de otro sistema)
             return response()->json(['ok' => true]);
         }
 
-        // Si el render ya está en estado terminal lo ignoramos
         if (in_array($render->status, ['completed', 'failed', 'cancelled'], true)) {
             return response()->json(['ok' => true]);
         }
@@ -49,38 +47,34 @@ class RunPodWebhookController extends Controller
         $rawStatus = $payload['status'] ?? 'FAILED';
 
         $statusMap = [
-            'COMPLETED'  => 'completed',
-            'FAILED'     => 'failed',
-            'CANCELLED'  => 'cancelled',
-            'TIMED_OUT'  => 'failed',
+            'COMPLETED' => 'completed',
+            'FAILED'    => 'failed',
+            'CANCELLED' => 'cancelled',
+            'TIMED_OUT' => 'failed',
         ];
 
         $normalized = $statusMap[$rawStatus] ?? null;
 
         if (! $normalized) {
-            // Estado intermedio (IN_QUEUE, IN_PROGRESS) — ignorar, el poll se encarga
+            // Estado intermedio (IN_QUEUE, IN_PROGRESS) — el poll se encarga
             return response()->json(['ok' => true]);
         }
 
         if ($normalized === 'completed') {
-            $fileUrl  = $payload['output']['image_url']
-                ?? $payload['output']['images'][0]
-                ?? $payload['output'][0]
-                ?? null;
-
-            $filePath = null;
-            if ($fileUrl) {
-                $filePath = $this->downloadAndStore($fileUrl, $render);
-            }
+            // Delega el parsing de output ComfyUI al adapter (maneja base64 + URLs)
+            $filePath = $this->adapter->extractOutput($payload, $render);
 
             $render->update([
                 'status'       => 'completed',
-                'file_path'    => $filePath ?? $fileUrl,
+                'file_path'    => $filePath,
                 'gpu_cost_usd' => $this->parseCost($payload),
                 'metadata'     => array_merge($render->metadata ?? [], ['webhook_raw' => $payload]),
             ]);
 
-            Log::info('RunPod webhook: render completado', ['render_id' => $render->id]);
+            Log::info('RunPod webhook: render completado', [
+                'render_id' => $render->id,
+                'file_path' => $filePath,
+            ]);
         } else {
             $render->update([
                 'status'        => $normalized,
@@ -93,7 +87,7 @@ class RunPodWebhookController extends Controller
                 $render->increment('retry_count');
                 $render->update([
                     'status' => 'queued',
-                    'seed'   => random_int(1, 2_147_483_647),
+                    'seed'   => random_int(1, 999_999_999),
                     'job_id' => null,
                 ]);
                 SubmitRenderJob::dispatch($render->fresh())->delay(now()->addSeconds(5));
@@ -107,7 +101,6 @@ class RunPodWebhookController extends Controller
     {
         $secret = config('services.runpod.webhook_secret');
 
-        // Si no hay secret configurado, solo permitir en modo mock/local
         if (! $secret) {
             return app()->environment('local');
         }
@@ -122,23 +115,6 @@ class RunPodWebhookController extends Controller
         $expected = 'sha256=' . hash_hmac('sha256', $request->getContent(), $secret);
 
         return hash_equals($expected, $signature);
-    }
-
-    private function downloadAndStore(string $url, Render $render): ?string
-    {
-        try {
-            $contents = file_get_contents($url);
-            if ($contents === false) {
-                return null;
-            }
-            $ext  = str_contains($url, '.mp4') ? 'mp4' : 'webp';
-            $path = "renders/{$render->shot_id}/{$render->id}.{$ext}";
-            Storage::disk('public')->put($path, $contents);
-            return $path;
-        } catch (\Throwable $e) {
-            Log::warning('Webhook: no se pudo descargar el render', ['error' => $e->getMessage()]);
-            return null;
-        }
     }
 
     private function parseCost(array $payload): ?float

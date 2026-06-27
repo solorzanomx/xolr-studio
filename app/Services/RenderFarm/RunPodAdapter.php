@@ -8,48 +8,52 @@ use App\Models\Render;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use RuntimeException;
 
 class RunPodAdapter implements RenderFarmContract
 {
     private const BASE_URL = 'https://api.runpod.io/v2';
 
-    // Parámetros por tier de calidad
     private const TIER_PARAMS = [
         'draft' => [
-            'num_inference_steps' => 4,
-            'guidance_scale'      => 0.0,  // FLUX Schnell no usa CFG
-            'model'               => 'schnell',
+            'model'     => 'schnell',
+            'steps'     => 4,
+            'scheduler' => 'simple',
+            'guidance'  => null,    // Schnell no usa guidance
         ],
         'standard' => [
-            'num_inference_steps' => 28,
-            'guidance_scale'      => 3.5,
-            'model'               => 'dev',
+            'model'     => 'dev',
+            'steps'     => 20,
+            'scheduler' => 'beta',
+            'guidance'  => 3.5,
         ],
         'final' => [
-            'num_inference_steps' => 28,
-            'guidance_scale'      => 3.5,
-            'model'               => 'dev',
-            'upscale'             => true,
-            'upscale_factor'      => 4,
+            'model'     => 'dev',
+            'steps'     => 28,
+            'scheduler' => 'beta',
+            'guidance'  => 3.5,
         ],
     ];
 
     private const STATUS_MAP = [
-        'IN_QUEUE'   => 'queued',
-        'IN_PROGRESS'=> 'processing',
-        'COMPLETED'  => 'completed',
-        'FAILED'     => 'failed',
-        'CANCELLED'  => 'cancelled',
-        'TIMED_OUT'  => 'failed',
+        'IN_QUEUE'    => 'queued',
+        'IN_PROGRESS' => 'processing',
+        'COMPLETED'   => 'completed',
+        'FAILED'      => 'failed',
+        'CANCELLED'   => 'cancelled',
+        'TIMED_OUT'   => 'failed',
     ];
 
     public function __construct(
         private readonly string $apiKey,
-        private readonly array $endpoints,   // ['image' => id, 'video' => id, 'upscale' => id]
+        private readonly array $endpoints,
         private readonly ?string $webhookSecret,
+        private readonly array $models = [],
         private readonly bool $mockMode = false,
     ) {}
+
+    // ─── Contract ────────────────────────────────────────────────────────────
 
     public function submit(Render $render): string
     {
@@ -76,10 +80,14 @@ class RunPodAdapter implements RenderFarmContract
             $jobId = $response->json('id');
 
             if (! $jobId) {
-                throw new RuntimeException('RunPod devolvió respuesta sin job id: ' . $response->body());
+                throw new RuntimeException('RunPod sin job id: ' . $response->body());
             }
 
-            Log::info('RunPod job submitted', ['job_id' => $jobId, 'render_id' => $render->id, 'tier' => $render->quality_tier]);
+            Log::info('RunPod job submitted', [
+                'job_id'    => $jobId,
+                'render_id' => $render->id,
+                'tier'      => $render->quality_tier,
+            ]);
 
             return $jobId;
 
@@ -103,24 +111,22 @@ class RunPodAdapter implements RenderFarmContract
 
             if ($response->failed()) {
                 return new RenderStatusResult(
-                    status: 'failed',
-                    fileUrl: null,
-                    costUsd: null,
-                    errorMessage: "RunPod status check failed [{$response->status()}]",
-                    raw: $response->json() ?? [],
+                    status:       'failed',
+                    fileUrl:      null,
+                    costUsd:      null,
+                    errorMessage: "Status check failed [{$response->status()}]",
+                    raw:          $response->json() ?? [],
                 );
             }
 
-            $data       = $response->json();
-            $rawStatus  = $data['status'] ?? 'FAILED';
+            $data      = $response->json();
+            $rawStatus = $data['status'] ?? 'FAILED';
             $normalized = self::STATUS_MAP[$rawStatus] ?? 'failed';
 
             $fileUrl = null;
+
             if ($normalized === 'completed') {
-                $fileUrl = $data['output']['image_url']
-                    ?? $data['output']['images'][0]
-                    ?? $data['output'][0]
-                    ?? null;
+                $fileUrl = $this->extractOutput($data, $render);
             }
 
             $costUsd = isset($data['executionTime'])
@@ -128,20 +134,20 @@ class RunPodAdapter implements RenderFarmContract
                 : null;
 
             return new RenderStatusResult(
-                status: $normalized,
-                fileUrl: $fileUrl,
-                costUsd: $costUsd,
+                status:       $normalized,
+                fileUrl:      $fileUrl,
+                costUsd:      $costUsd,
                 errorMessage: $data['error'] ?? null,
-                raw: $data,
+                raw:          $data,
             );
 
-        } catch (ConnectionException $e) {
+        } catch (ConnectionException) {
             return new RenderStatusResult(
-                status: 'processing',  // asumir en progreso si no podemos conectar
-                fileUrl: null,
-                costUsd: null,
+                status:       'processing',
+                fileUrl:      null,
+                costUsd:      null,
                 errorMessage: null,
-                raw: [],
+                raw:          [],
             );
         }
     }
@@ -161,7 +167,159 @@ class RunPodAdapter implements RenderFarmContract
         return $response->successful();
     }
 
-    // ─── Helpers privados ────────────────────────────────────────────────
+    // ─── ComfyUI payload ─────────────────────────────────────────────────────
+
+    private function buildPayload(Render $render): array
+    {
+        $prompt  = $render->prompt;
+        $preset  = $render->shot?->formatPreset;
+        $params  = self::TIER_PARAMS[$render->quality_tier] ?? self::TIER_PARAMS['draft'];
+
+        $seed   = $render->seed ?? random_int(1, 999_999_999);
+        $width  = $render->width  ?? $preset?->width  ?? 1024;
+        $height = $render->height ?? $preset?->height ?? 1024;
+
+        $positivePrompt = $prompt?->positive_prompt ?? '';
+
+        $workflow = $params['model'] === 'schnell'
+            ? $this->schnellWorkflow($positivePrompt, $seed, $width, $height, $params['steps'])
+            : $this->devWorkflow($positivePrompt, $seed, $width, $height, $params['steps'], $params['guidance'] ?? 3.5);
+
+        $payload = [
+            'input' => ['workflow' => $workflow],
+        ];
+
+        // Webhook va a nivel raíz del job, no dentro de input
+        $payload['webhook'] = config('app.url') . '/api/webhooks/runpod';
+
+        return $payload;
+    }
+
+    /**
+     * FLUX Schnell — 4 pasos, sin guidance, para drafts rápidos.
+     */
+    private function schnellWorkflow(
+        string $prompt,
+        int $seed,
+        int $width,
+        int $height,
+        int $steps,
+    ): array {
+        $modelSchnell = $this->model('schnell');
+        $clipL        = $this->model('clip_l');
+        $clipT5       = $this->model('clip_t5');
+        $vae          = $this->model('vae');
+
+        return [
+            '1'  => ['class_type' => 'UNETLoader',    'inputs' => ['unet_name' => $modelSchnell, 'weight_dtype' => 'fp8_e4m3fn']],
+            '2'  => ['class_type' => 'DualCLIPLoader', 'inputs' => ['clip_name1' => $clipL, 'clip_name2' => $clipT5, 'type' => 'flux']],
+            '3'  => ['class_type' => 'VAELoader',      'inputs' => ['vae_name' => $vae]],
+            '4'  => ['class_type' => 'CLIPTextEncode', 'inputs' => ['text' => $prompt, 'clip' => ['2', 0]]],
+            '5'  => ['class_type' => 'EmptySD3LatentImage', 'inputs' => ['width' => $width, 'height' => $height, 'batch_size' => 1]],
+            '6'  => ['class_type' => 'RandomNoise',    'inputs' => ['noise_seed' => $seed]],
+            '7'  => ['class_type' => 'BasicGuider',    'inputs' => ['model' => ['1', 0], 'conditioning' => ['4', 0]]],
+            '8'  => ['class_type' => 'KSamplerSelect', 'inputs' => ['sampler_name' => 'euler']],
+            '9'  => ['class_type' => 'BasicScheduler', 'inputs' => ['model' => ['1', 0], 'scheduler' => 'simple', 'steps' => $steps, 'denoise' => 1.0]],
+            '10' => ['class_type' => 'SamplerCustomAdvanced', 'inputs' => ['noise' => ['6', 0], 'guider' => ['7', 0], 'sampler' => ['8', 0], 'sigmas' => ['9', 0], 'latent_image' => ['5', 0]]],
+            '11' => ['class_type' => 'VAEDecode',      'inputs' => ['samples' => ['10', 0], 'vae' => ['3', 0]]],
+            '12' => ['class_type' => 'SaveImage',      'inputs' => ['filename_prefix' => 'xolr', 'images' => ['11', 0]]],
+        ];
+    }
+
+    /**
+     * FLUX Dev — 20-28 pasos, FluxGuidance, para renders de calidad.
+     */
+    private function devWorkflow(
+        string $prompt,
+        int $seed,
+        int $width,
+        int $height,
+        int $steps,
+        float $guidance,
+    ): array {
+        $modelDev = $this->model('dev');
+        $clipL    = $this->model('clip_l');
+        $clipT5   = $this->model('clip_t5');
+        $vae      = $this->model('vae');
+
+        return [
+            '1'  => ['class_type' => 'UNETLoader',    'inputs' => ['unet_name' => $modelDev, 'weight_dtype' => 'fp8_e4m3fn']],
+            '2'  => ['class_type' => 'DualCLIPLoader', 'inputs' => ['clip_name1' => $clipL, 'clip_name2' => $clipT5, 'type' => 'flux']],
+            '3'  => ['class_type' => 'VAELoader',      'inputs' => ['vae_name' => $vae]],
+            '4'  => ['class_type' => 'CLIPTextEncode', 'inputs' => ['text' => $prompt, 'clip' => ['2', 0]]],
+            // FluxGuidance entre CLIP y Guider — característico de Dev
+            '4g' => ['class_type' => 'FluxGuidance',  'inputs' => ['conditioning' => ['4', 0], 'guidance' => $guidance]],
+            '5'  => ['class_type' => 'EmptySD3LatentImage', 'inputs' => ['width' => $width, 'height' => $height, 'batch_size' => 1]],
+            '6'  => ['class_type' => 'RandomNoise',    'inputs' => ['noise_seed' => $seed]],
+            '7'  => ['class_type' => 'BasicGuider',    'inputs' => ['model' => ['1', 0], 'conditioning' => ['4g', 0]]],
+            '8'  => ['class_type' => 'KSamplerSelect', 'inputs' => ['sampler_name' => 'euler']],
+            '9'  => ['class_type' => 'BasicScheduler', 'inputs' => ['model' => ['1', 0], 'scheduler' => 'beta', 'steps' => $steps, 'denoise' => 1.0]],
+            '10' => ['class_type' => 'SamplerCustomAdvanced', 'inputs' => ['noise' => ['6', 0], 'guider' => ['7', 0], 'sampler' => ['8', 0], 'sigmas' => ['9', 0], 'latent_image' => ['5', 0]]],
+            '11' => ['class_type' => 'VAEDecode',      'inputs' => ['samples' => ['10', 0], 'vae' => ['3', 0]]],
+            '12' => ['class_type' => 'SaveImage',      'inputs' => ['filename_prefix' => 'xolr', 'images' => ['11', 0]]],
+        ];
+    }
+
+    // ─── Output parsing ──────────────────────────────────────────────────────
+
+    /**
+     * Extrae la imagen del output de ComfyUI y la guarda en storage.
+     * Soporta: base64 (images_b64), URL directa (image_url), array de outputs.
+     */
+    public function extractOutput(array $data, Render $render): ?string
+    {
+        // ComfyUI devuelve output como array (un elemento por prompt ejecutado)
+        $output = $data['output'] ?? null;
+
+        if (is_array($output) && array_is_list($output) && isset($output[0])) {
+            $output = $output[0];
+        }
+
+        if (! $output) {
+            return null;
+        }
+
+        // Prioridad 1: imagen en base64
+        $b64 = $output['images_b64'][0] ?? null;
+        if ($b64) {
+            return $this->storeBase64Image($b64, $render);
+        }
+
+        // Prioridad 2: URL CDN directa
+        if (! empty($output['image_url'])) {
+            return $output['image_url'];
+        }
+
+        // Prioridad 3: mensaje base64 (algunos workers lo ponen en 'message')
+        $msg = $output['message'] ?? null;
+        if ($msg && ! str_starts_with($msg, 'http')) {
+            return $this->storeBase64Image($msg, $render);
+        }
+
+        return null;
+    }
+
+    private function storeBase64Image(string $b64, Render $render): ?string
+    {
+        // Quitar prefijo data URI si viene
+        $b64 = preg_replace('/^data:image\/\w+;base64,/', '', $b64);
+
+        $contents = base64_decode($b64, strict: true);
+
+        if ($contents === false) {
+            Log::warning('RunPod: base64 decode falló', ['render_id' => $render->id]);
+            return null;
+        }
+
+        $path = "renders/{$render->shot_id}/{$render->id}.png";
+        Storage::disk('public')->put($path, $contents);
+
+        Log::info('RunPod: imagen guardada', ['path' => $path, 'render_id' => $render->id]);
+
+        return $path;
+    }
+
+    // ─── Helpers ─────────────────────────────────────────────────────────────
 
     private function resolveEndpoint(Render $render): string
     {
@@ -169,6 +327,11 @@ class RunPodAdapter implements RenderFarmContract
             'final'  => 'upscale',
             default  => $render->file_type === 'video' ? 'video' : 'image',
         };
+
+        // Si no hay endpoint de upscale configurado, usar el de imagen
+        if ($key === 'upscale' && empty($this->endpoints['upscale'])) {
+            $key = 'image';
+        }
 
         $id = $this->endpoints[$key] ?? null;
 
@@ -179,38 +342,20 @@ class RunPodAdapter implements RenderFarmContract
         return $id;
     }
 
-    private function buildPayload(Render $render): array
+    private function model(string $key): string
     {
-        $prompt   = $render->prompt;
-        $preset   = $render->shot?->formatPreset;
-        $params   = self::TIER_PARAMS[$render->quality_tier] ?? self::TIER_PARAMS['draft'];
-
-        $seed = $render->seed ?? random_int(1, 2_147_483_647);
-
-        $input = [
-            'prompt'               => $prompt?->positive_prompt ?? '',
-            'negative_prompt'      => $prompt?->negative_prompt ?? '',
-            'seed'                 => $seed,
-            'num_inference_steps'  => $params['num_inference_steps'],
-            'guidance_scale'       => $params['guidance_scale'],
-            'width'                => $render->width ?? $preset?->width ?? 1024,
-            'height'               => $render->height ?? $preset?->height ?? 1024,
-        ];
-
-        if ($params['upscale'] ?? false) {
-            $input['upscale_factor'] = $params['upscale_factor'];
-        }
-
-        // Webhook para notificación asíncrona cuando el job termina
-        $webhookUrl = config('app.url') . '/api/webhooks/runpod';
-        $input['webhook'] = $webhookUrl;
-
-        return ['input' => $input];
+        return $this->models[$key] ?? match ($key) {
+            'schnell' => 'flux1-schnell-fp8.safetensors',
+            'dev'     => 'flux1-dev-fp8.safetensors',
+            'clip_l'  => 'clip_l.safetensors',
+            'clip_t5' => 't5xxl_fp8_e4m3fn.safetensors',
+            'vae'     => 'ae.safetensors',
+            default   => throw new RuntimeException("Modelo RunPod '{$key}' no definido"),
+        };
     }
 
     private function estimateCost(string $tier, int $executionTimeMs): float
     {
-        // RunPod cobra por segundo de GPU — aproximación hasta que tengamos billing API
         $ratePerSecond = match ($tier) {
             'draft'    => 0.00025,
             'standard' => 0.00042,
@@ -221,18 +366,17 @@ class RunPodAdapter implements RenderFarmContract
         return round(($executionTimeMs / 1000) * $ratePerSecond, 6);
     }
 
-    // ─── Mock mode ───────────────────────────────────────────────────────
+    // ─── Mock ────────────────────────────────────────────────────────────────
 
     private function mockSubmit(Render $render): string
     {
-        $fakeJobId = 'mock-' . uniqid('', true);
-        Log::info('[MOCK] RunPod job submitted', ['job_id' => $fakeJobId, 'render_id' => $render->id]);
-        return $fakeJobId;
+        $jobId = 'mock-' . uniqid('', true);
+        Log::info('[MOCK] RunPod job submitted', ['job_id' => $jobId, 'render_id' => $render->id]);
+        return $jobId;
     }
 
     private function mockStatus(Render $render): RenderStatusResult
     {
-        // Simula progresión: si el render fue creado hace más de 10s, lo completa
         $age = now()->diffInSeconds($render->created_at);
 
         if ($age < 10) {
@@ -240,7 +384,7 @@ class RunPodAdapter implements RenderFarmContract
         }
 
         return new RenderStatusResult(
-            status: 'completed',
+            status:  'completed',
             fileUrl: 'https://placehold.co/1024x1024/1a1a1a/888888?text=Mock+Render',
             costUsd: match ($render->quality_tier) {
                 'draft'    => 0.005,
