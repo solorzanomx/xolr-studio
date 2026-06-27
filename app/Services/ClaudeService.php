@@ -71,7 +71,7 @@ PROMPT;
         }
 
         $text    = $response->json('content.0.text', '');
-        $decoded = json_decode($text, true);
+        $decoded = json_decode($this->stripMarkdown($text), true);
 
         if (json_last_error() !== JSON_ERROR_NONE) {
             throw new \RuntimeException('Claude devolvió una respuesta inválida.');
@@ -125,13 +125,21 @@ PROMPT;
             throw new \RuntimeException('Error al conectar con Claude API: ' . $response->status());
         }
 
-        $text = $response->json('content.0.text', '');
+        $text    = $response->json('content.0.text', '');
+        $decoded = json_decode($this->stripMarkdown($text), true);
 
-        $decoded = json_decode($text, true);
         if (json_last_error() !== JSON_ERROR_NONE) {
             throw new \RuntimeException('Claude devolvió una respuesta inválida.');
         }
 
         return $decoded;
+    }
+
+    private function stripMarkdown(string $text): string
+    {
+        // Quita bloques ```json ... ``` o ``` ... ``` que Claude añade a veces
+        $text = preg_replace('/^```(?:json)?\s*/m', '', $text);
+        $text = preg_replace('/\s*```\s*$/m', '', $text);
+        return trim($text);
     }
 }
