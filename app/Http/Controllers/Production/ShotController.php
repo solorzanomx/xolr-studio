@@ -32,6 +32,7 @@ class ShotController extends Controller
             'visualStyle',
             'formatPreset',
             'prompts',
+            'renders' => fn($q) => $q->orderByDesc('created_at'),
         ]);
 
         // Determinar el contexto del shot para breadcrumb de regreso

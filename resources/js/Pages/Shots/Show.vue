@@ -1,11 +1,11 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { Link, router, useForm } from '@inertiajs/vue3'
 import AppLayout from '@/Layouts/AppLayout.vue'
 import {
     ArrowLeft, Wand2, Clock, Zap, Copy, Check,
     ChevronDown, History, UserPlus, UserMinus,
-    RefreshCw, Save
+    RefreshCw, Save, CheckCircle, XCircle, Loader, Image
 } from '@lucide/vue'
 
 const props = defineProps({
@@ -60,6 +60,38 @@ const submitRender = () => {
     renderForm.quality_tier = selectedTier.value
     renderForm.post(`/shots/${props.shot.id}/renders`, { preserveScroll: true })
 }
+
+// ── Galería de renders ───────────────────────
+const renders = computed(() => props.shot.renders ?? [])
+const hasActiveRenders = computed(() =>
+    renders.value.some(r => ['queued', 'processing'].includes(r.status))
+)
+
+const RENDER_STATUS = {
+    queued:     { label: 'En cola',      class: 'text-text-muted bg-surface-3' },
+    processing: { label: 'Procesando',   class: 'text-amber bg-amber/10' },
+    completed:  { label: 'Completado',   class: 'text-green-400 bg-green-400/10' },
+    failed:     { label: 'Fallido',      class: 'text-red-400 bg-red-400/10' },
+    cancelled:  { label: 'Cancelado',    class: 'text-text-muted bg-surface-3' },
+}
+
+const approveRender = (render) => {
+    router.post(`/renders/${render.id}/approve`, {}, { preserveScroll: true })
+}
+const deleteRender = (render) => {
+    router.delete(`/renders/${render.id}`, { preserveScroll: true })
+}
+
+// Polling: refresca solo la prop shot cada 5s si hay renders activos
+let pollInterval = null
+onMounted(() => {
+    pollInterval = setInterval(() => {
+        if (hasActiveRenders.value) {
+            router.reload({ only: ['shot'], preserveScroll: true })
+        }
+    }, 5000)
+})
+onUnmounted(() => clearInterval(pollInterval))
 
 // ────────────────────────────────────────────
 // Section collapse state
@@ -388,6 +420,81 @@ const STATUS_COLORS = {
                             <Zap class="w-3 h-3" />
                             {{ renderForm.processing ? 'Encolando…' : 'Enviar a render' }}
                         </button>
+                    </div>
+                </div>
+
+                <!-- Galería de renders -->
+                <div v-if="renders.length" class="bg-surface-1 border border-border rounded-lg overflow-hidden">
+                    <div class="flex items-center justify-between px-4 py-3 border-b border-border">
+                        <h3 class="text-sm font-semibold text-text-primary flex items-center gap-2">
+                            <Image class="w-4 h-4 text-text-muted" />
+                            Renders ({{ renders.length }})
+                        </h3>
+                        <div v-if="hasActiveRenders" class="flex items-center gap-1.5 text-xs text-amber">
+                            <Loader class="w-3 h-3 animate-spin" />
+                            Actualizando…
+                        </div>
+                    </div>
+
+                    <div class="p-4 grid grid-cols-2 gap-3">
+                        <div
+                            v-for="render in renders"
+                            :key="render.id"
+                            class="bg-surface-0 rounded-lg border border-border overflow-hidden group relative"
+                        >
+                            <!-- Imagen o placeholder -->
+                            <div class="aspect-square bg-surface-2 flex items-center justify-center relative">
+                                <img
+                                    v-if="render.status === 'completed' && render.file_path"
+                                    :src="render.file_path.startsWith('http') ? render.file_path : `/storage/${render.file_path}`"
+                                    class="w-full h-full object-cover"
+                                    :alt="`Render ${render.id}`"
+                                />
+                                <div v-else class="flex flex-col items-center gap-2 text-text-muted">
+                                    <Loader v-if="['queued','processing'].includes(render.status)" class="w-6 h-6 animate-spin text-amber" />
+                                    <XCircle v-else-if="render.status === 'failed'" class="w-6 h-6 text-red-400" />
+                                    <Image v-else class="w-6 h-6 opacity-30" />
+                                </div>
+
+                                <!-- Aprobado badge -->
+                                <div v-if="render.is_approved" class="absolute top-2 right-2 bg-green-500 rounded-full p-0.5">
+                                    <CheckCircle class="w-3.5 h-3.5 text-white" />
+                                </div>
+                            </div>
+
+                            <!-- Meta -->
+                            <div class="p-2 space-y-1.5">
+                                <div class="flex items-center justify-between gap-1">
+                                    <span :class="['text-xs px-1.5 py-0.5 rounded font-mono', RENDER_STATUS[render.status]?.class ?? 'text-text-muted bg-surface-3']">
+                                        {{ RENDER_STATUS[render.status]?.label ?? render.status }}
+                                    </span>
+                                    <span class="text-xs text-text-muted font-mono capitalize">{{ render.quality_tier }}</span>
+                                </div>
+
+                                <div v-if="render.gpu_cost_usd" class="text-xs text-text-muted font-mono">
+                                    ${{ Number(render.gpu_cost_usd).toFixed(4) }}
+                                </div>
+
+                                <p v-if="render.error_message" class="text-xs text-red-400 line-clamp-2">{{ render.error_message }}</p>
+
+                                <!-- Acciones -->
+                                <div class="flex gap-1 pt-1">
+                                    <button
+                                        v-if="render.status === 'completed' && !render.is_approved"
+                                        @click="approveRender(render)"
+                                        class="flex-1 text-xs bg-green-500/10 text-green-400 hover:bg-green-500/20 transition-colors px-2 py-1 rounded font-medium"
+                                    >
+                                        Aprobar
+                                    </button>
+                                    <button
+                                        @click="deleteRender(render)"
+                                        class="text-xs text-text-muted hover:text-red-400 transition-colors px-2 py-1 rounded"
+                                    >
+                                        <XCircle class="w-3.5 h-3.5" />
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
