@@ -68,8 +68,13 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
 
     // Shots
     Route::post('scenes/{scene}/shots', [ShotController::class, 'store'])->name('scenes.shots.store');
+    Route::get('shots/{shot}', [ShotController::class, 'show'])->name('shots.show');
     Route::put('shots/{shot}', [ShotController::class, 'update'])->name('shots.update');
     Route::delete('shots/{shot}', [ShotController::class, 'destroy'])->name('shots.destroy');
+    Route::post('shots/{shot}/compose-prompt', [ShotController::class, 'composePrompt'])->name('shots.compose-prompt');
+    Route::post('shots/{shot}/save-prompt', [ShotController::class, 'savePrompt'])->name('shots.save-prompt');
+    Route::post('shots/{shot}/characters', [ShotController::class, 'addCharacter'])->name('shots.characters.store');
+    Route::delete('shots/{shot}/characters/{character}', [ShotController::class, 'removeCharacter'])->name('shots.characters.destroy');
 
     // Properties (nested bajo proyecto)
     Route::post('projects/{project}/properties', [PropertyController::class, 'store'])->name('projects.properties.store');

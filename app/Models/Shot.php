@@ -48,7 +48,12 @@ class Shot extends Model
 
     public function prompt(): HasOne
     {
-        return $this->hasOne(Prompt::class);
+        return $this->hasOne(Prompt::class)->where('is_active', true)->latest();
+    }
+
+    public function prompts(): HasMany
+    {
+        return $this->hasMany(Prompt::class)->orderByDesc('version');
     }
 
     public function renders(): HasMany
