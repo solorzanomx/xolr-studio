@@ -31,9 +31,15 @@ use App\Http\Controllers\Publishing\ExportController;
 use App\Http\Controllers\Publishing\PrintController;
 use App\Http\Controllers\Budget\BudgetController;
 use App\Http\Controllers\Notifications\NotificationController;
+use App\Http\Controllers\Share\PreviewController;
+use App\Http\Controllers\Share\ShareController;
 use App\Http\Controllers\Social\CalendarController;
 use App\Http\Controllers\Analytics\AnalyticsController;
 use Illuminate\Support\Facades\Route;
+
+// Public preview routes (no auth)
+Route::get('/preview/{token}', [PreviewController::class, 'show'])->name('preview.show');
+Route::post('/preview/{token}/auth', [PreviewController::class, 'authenticate'])->name('preview.auth');
 
 Route::middleware(['auth', 'verified'])->group(function (): void {
     Route::get('/', DashboardController::class)->name('dashboard');
@@ -145,6 +151,11 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
     // Analytics
     Route::get('/analytics', [AnalyticsController::class, 'index'])->name('analytics');
     Route::post('/analytics/sync', [AnalyticsController::class, 'syncNow'])->name('analytics.sync');
+
+    // Share tokens
+    Route::post('/episodes/{episode}/share', [ShareController::class, 'storeEpisode'])->name('episodes.share.store');
+    Route::post('/projects/{project}/share', [ShareController::class, 'storeProject'])->name('projects.share.store');
+    Route::delete('/share/{shareToken}', [ShareController::class, 'destroy'])->name('share.destroy');
 
     // Notifications
     Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications');

@@ -2,13 +2,41 @@
 import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3'
 import { ref, computed, onBeforeUnmount } from 'vue'
 import AppLayout from '@/Layouts/AppLayout.vue'
-import { ChevronLeft, Pencil, FileText, Camera, Plus, Trash2, Image, Video, Mic, Sparkles, BookOpen, CheckCheck, Wand2, X, AlertTriangle } from '@lucide/vue'
+import { ChevronLeft, Pencil, FileText, Camera, Plus, Trash2, Image, Video, Mic, Sparkles, BookOpen, CheckCheck, Wand2, X, AlertTriangle, Share2, Link2, Lock, Eye } from '@lucide/vue'
 import { useEditor, EditorContent } from '@tiptap/vue-3'
 import StarterKit from '@tiptap/starter-kit'
 const props = defineProps({
-    episode: Object,
-    locations: Array,
+    episode:     Object,
+    locations:   Array,
+    shareTokens: Array,
 })
+
+// ── Share modal ──────────────────────────────────────────────────
+const showShare = ref(false)
+const copied    = ref(false)
+
+const shareForm = useForm({
+    label:      '',
+    password:   '',
+    expires_in: 'never',
+})
+
+function createShare() {
+    shareForm.post(`/episodes/${props.episode.id}/share`, {
+        onSuccess: () => shareForm.reset(),
+        preserveScroll: true,
+    })
+}
+
+function deleteShare(id) {
+    router.delete(`/share/${id}`, { preserveScroll: true })
+}
+
+function copyLink(url) {
+    navigator.clipboard.writeText(url)
+    copied.value = true
+    setTimeout(() => { copied.value = false }, 2000)
+}
 
 const activeTab = ref('info')
 
@@ -209,9 +237,17 @@ const epStatusLabel = {
                 <h1 class="text-xl font-semibold text-text-primary">{{ episode.title }}</h1>
                 <p v-if="episode.logline" class="text-sm text-text-muted mt-0.5 italic">{{ episode.logline }}</p>
             </div>
-            <Link :href="`/episodes/${episode.id}/edit`" class="inline-flex items-center gap-2 px-3 py-2 bg-surface-1 border border-border rounded-lg text-sm text-text-secondary hover:text-text-primary transition-colors">
-                <Pencil class="w-4 h-4" /> Editar
-            </Link>
+            <div class="flex items-center gap-2">
+                <button @click="showShare = true"
+                    class="inline-flex items-center gap-2 px-3 py-2 bg-surface-1 border border-border rounded-lg text-sm text-text-secondary hover:text-text-primary hover:border-amber transition-colors">
+                    <Share2 class="w-4 h-4" />
+                    <span class="hidden sm:inline">Compartir</span>
+                    <span v-if="shareTokens?.length" class="text-[10px] font-mono text-amber">{{ shareTokens.length }}</span>
+                </button>
+                <Link :href="`/episodes/${episode.id}/edit`" class="inline-flex items-center gap-2 px-3 py-2 bg-surface-1 border border-border rounded-lg text-sm text-text-secondary hover:text-text-primary transition-colors">
+                    <Pencil class="w-4 h-4" /> Editar
+                </Link>
+            </div>
         </div>
 
         <!-- Tabs -->
@@ -644,6 +680,80 @@ const epStatusLabel = {
                                 <button @click="editingShot = null; editShotForm.reset()" class="text-xs text-text-muted hover:text-text-primary transition-colors">Cancelar</button>
                             </div>
                         </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Share Modal -->
+        <div v-if="showShare" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60" @click.self="showShare = false">
+            <div class="bg-surface-1 border border-border rounded-2xl p-6 w-full max-w-md mx-4 shadow-2xl">
+                <div class="flex items-center justify-between mb-5">
+                    <h3 class="text-base font-semibold text-text-primary flex items-center gap-2">
+                        <Share2 class="w-4 h-4 text-amber" /> Compartir preview
+                    </h3>
+                    <button @click="showShare = false" class="text-text-muted hover:text-text-primary transition-colors">
+                        <X class="w-5 h-5" />
+                    </button>
+                </div>
+
+                <!-- Create new link -->
+                <form @submit.prevent="createShare" class="space-y-3 mb-5">
+                    <div>
+                        <label class="block text-xs text-text-muted mb-1">Etiqueta (opcional)</label>
+                        <input v-model="shareForm.label" type="text" placeholder="Ej: Review cliente — semana 3"
+                            class="w-full bg-surface-2 border border-border rounded-lg px-3 py-2 text-sm text-text-primary placeholder-text-muted focus:outline-none focus:border-amber transition-colors" />
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs text-text-muted mb-1">Contraseña (opcional)</label>
+                            <input v-model="shareForm.password" type="password" placeholder="Sin contraseña"
+                                class="w-full bg-surface-2 border border-border rounded-lg px-3 py-2 text-sm text-text-primary placeholder-text-muted focus:outline-none focus:border-amber transition-colors" />
+                        </div>
+                        <div>
+                            <label class="block text-xs text-text-muted mb-1">Expira en</label>
+                            <select v-model="shareForm.expires_in"
+                                class="w-full bg-surface-2 border border-border rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-amber transition-colors">
+                                <option value="never">Nunca</option>
+                                <option value="7">7 días</option>
+                                <option value="30">30 días</option>
+                                <option value="90">90 días</option>
+                            </select>
+                        </div>
+                    </div>
+                    <button type="submit" :disabled="shareForm.processing"
+                        class="w-full py-2 bg-amber text-surface-0 text-sm font-semibold rounded-lg hover:bg-amber/90 disabled:opacity-50 transition-colors flex items-center justify-center gap-2">
+                        <Link2 class="w-4 h-4" /> Generar link
+                    </button>
+                </form>
+
+                <!-- Existing tokens -->
+                <div v-if="shareTokens?.length" class="border-t border-border pt-4 space-y-2">
+                    <p class="text-xs text-text-muted mb-2">Links activos</p>
+                    <div v-for="t in shareTokens" :key="t.id"
+                        class="flex items-center gap-2 bg-surface-2 rounded-lg px-3 py-2"
+                        :class="t.expired ? 'opacity-50' : ''">
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center gap-1.5">
+                                <span class="text-xs font-medium text-text-primary truncate">{{ t.label || 'Sin etiqueta' }}</span>
+                                <Lock v-if="t.protected" class="w-3 h-3 text-text-muted shrink-0" />
+                                <span v-if="t.expired" class="text-[9px] text-danger">expirado</span>
+                            </div>
+                            <div class="flex items-center gap-2 mt-0.5">
+                                <span class="text-[10px] text-text-muted font-mono truncate">{{ t.url }}</span>
+                                <span class="text-[9px] text-text-muted flex items-center gap-0.5 shrink-0">
+                                    <Eye class="w-2.5 h-2.5" />{{ t.view_count }}
+                                </span>
+                                <span v-if="t.expires_at" class="text-[9px] text-text-muted shrink-0">exp. {{ t.expires_at }}</span>
+                            </div>
+                        </div>
+                        <button @click="copyLink(t.url)"
+                            class="text-[10px] px-2 py-1 bg-surface-1 border border-border rounded text-text-muted hover:text-amber hover:border-amber transition-colors shrink-0">
+                            {{ copied ? '✓' : 'Copiar' }}
+                        </button>
+                        <button @click="deleteShare(t.id)"
+                            class="p-1 text-text-muted hover:text-danger transition-colors shrink-0">
+                            <X class="w-3.5 h-3.5" />
+                        </button>
                     </div>
                 </div>
             </div>

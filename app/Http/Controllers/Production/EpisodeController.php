@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Episode;
 use App\Models\Location;
 use App\Models\Season;
+use App\Models\ShareToken;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -40,9 +41,25 @@ class EpisodeController extends Controller
             ])->orderBy('sort_order')->orderBy('number'),
         ]);
 
+        $shareTokens = ShareToken::where('shareable_type', Episode::class)
+            ->where('shareable_id', $episode->id)
+            ->latest()
+            ->get(['id', 'token', 'label', 'expires_at', 'view_count', 'password_hash'])
+            ->map(fn($t) => [
+                'id'         => $t->id,
+                'token'      => $t->token,
+                'label'      => $t->label,
+                'expires_at' => $t->expires_at?->toDateString(),
+                'view_count' => $t->view_count,
+                'protected'  => $t->password_hash !== null,
+                'expired'    => $t->isExpired(),
+                'url'        => url('/preview/' . $t->token),
+            ]);
+
         return Inertia::render('Episodes/Show', [
-            'episode'   => $episode,
-            'locations' => Location::where('is_active', true)->get(['id', 'name', 'type']),
+            'episode'     => $episode,
+            'locations'   => Location::where('is_active', true)->get(['id', 'name', 'type']),
+            'shareTokens' => $shareTokens,
         ]);
     }
 
