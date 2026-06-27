@@ -32,7 +32,7 @@ const navSections = [
             { label: 'Campañas', href: '/campaigns', icon: 'megaphone' },
             { label: 'Content Machine', href: '/content-machine', icon: 'lightbulb' },
             { label: 'Shots', href: '/shots', icon: 'camera' },
-            { label: 'Renders', href: '/renders', icon: 'image', soon: true },
+            { label: 'Renders', href: '/renders', icon: 'image' },
         ],
     },
     {

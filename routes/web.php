@@ -89,6 +89,8 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
     Route::delete('shots/{shot}/characters/{character}', [ShotController::class, 'removeCharacter'])->name('shots.characters.destroy');
 
     // Renders
+    Route::get('renders', [RenderController::class, 'index'])->name('renders.index');
+    Route::post('renders/bulk-approve', [RenderController::class, 'bulkApprove'])->name('renders.bulk-approve');
     Route::post('shots/{shot}/renders', [RenderController::class, 'store'])->name('shots.renders.store');
     Route::post('renders/{render}/approve', [RenderController::class, 'approve'])->name('renders.approve');
     Route::delete('renders/{render}', [RenderController::class, 'destroy'])->name('renders.destroy');
