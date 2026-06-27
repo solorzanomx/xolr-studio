@@ -18,41 +18,75 @@ class SettingsController extends Controller
         $apiKey     = config('services.runpod.api_key');
         $endpointId = config('services.runpod.endpoints.image');
 
-        if (! $apiKey) {
-            return response()->json(['ok' => false, 'message' => 'RUNPOD_API_KEY no configurado en .env']);
-        }
+        $steps = [
+            'api_key'  => ['ok' => false, 'label' => 'API Key',  'message' => ''],
+            'endpoint' => ['ok' => false, 'label' => 'Endpoint', 'message' => ''],
+        ];
 
-        if (! $endpointId) {
-            return response()->json(['ok' => false, 'message' => 'RUNPOD_ENDPOINT_IMAGE no configurado en .env']);
+        // ── Paso 1: verificar API Key vía GraphQL ────────────────────────
+        if (! $apiKey) {
+            $steps['api_key']['message'] = 'RUNPOD_API_KEY no está en .env';
+            $steps['endpoint']['message'] = 'Pendiente de API key';
+            return response()->json(['ok' => false, 'steps' => $steps]);
         }
 
         try {
-            $response = Http::withToken($apiKey)
+            $gql = Http::timeout(10)
+                ->post("https://api.runpod.io/graphql?api_key={$apiKey}", [
+                    'query' => '{ myself { id email } }',
+                ]);
+
+            if ($gql->successful() && ! isset($gql->json()['errors'])) {
+                $email = $gql->json()['data']['myself']['email'] ?? 'cuenta verificada';
+                $steps['api_key']['ok']      = true;
+                $steps['api_key']['message'] = "Válida — {$email}";
+            } elseif ($gql->status() === 401 || isset($gql->json()['errors'])) {
+                $steps['api_key']['message'] = 'API Key inválida — revisa que no tenga espacios ni esté expirada';
+                $steps['endpoint']['message'] = 'Pendiente de API key válida';
+                return response()->json(['ok' => false, 'steps' => $steps]);
+            } else {
+                $steps['api_key']['message'] = "RunPod respondió {$gql->status()} al verificar key";
+                $steps['endpoint']['message'] = 'No verificado';
+                return response()->json(['ok' => false, 'steps' => $steps]);
+            }
+        } catch (\Throwable $e) {
+            $steps['api_key']['message'] = 'Sin conexión a RunPod: ' . $e->getMessage();
+            $steps['endpoint']['message'] = 'No verificado';
+            return response()->json(['ok' => false, 'steps' => $steps]);
+        }
+
+        // ── Paso 2: verificar Endpoint ───────────────────────────────────
+        if (! $endpointId) {
+            $steps['endpoint']['message'] = 'RUNPOD_ENDPOINT_IMAGE no está en .env';
+            return response()->json(['ok' => false, 'steps' => $steps]);
+        }
+
+        try {
+            $health = Http::withToken($apiKey)
                 ->timeout(10)
                 ->get("https://api.runpod.io/v2/{$endpointId}/health");
 
-            if ($response->successful()) {
-                $data    = $response->json();
-                $workers = $data['workers'] ?? [];
-                $ready   = ($workers['ready'] ?? 0);
-                $idle    = ($workers['idle'] ?? 0);
-                $msg     = "Endpoint activo — {$ready} workers listos, {$idle} idle";
-                return response()->json(['ok' => true, 'message' => $msg, 'raw' => $workers]);
+            if ($health->successful()) {
+                $workers = $health->json()['workers'] ?? [];
+                $ready   = $workers['ready']   ?? 0;
+                $idle    = $workers['idle']     ?? 0;
+                $running = $workers['running']  ?? 0;
+                $steps['endpoint']['ok']      = true;
+                $steps['endpoint']['message'] = "ID: {$endpointId} — ready:{$ready} idle:{$idle} running:{$running}";
+                return response()->json(['ok' => true, 'steps' => $steps, 'workers' => $workers]);
             }
 
-            if ($response->status() === 401) {
-                return response()->json(['ok' => false, 'message' => 'API Key inválida (401 Unauthorized)']);
+            if ($health->status() === 404) {
+                $steps['endpoint']['message'] = "Endpoint '{$endpointId}' no encontrado — verifica el ID";
+            } else {
+                $steps['endpoint']['message'] = "RunPod respondió {$health->status()}";
             }
-
-            if ($response->status() === 404) {
-                return response()->json(['ok' => false, 'message' => "Endpoint ID '{$endpointId}' no encontrado (404)"]);
-            }
-
-            return response()->json(['ok' => false, 'message' => "RunPod respondió {$response->status()}"]);
 
         } catch (\Throwable $e) {
-            return response()->json(['ok' => false, 'message' => 'No se pudo conectar: ' . $e->getMessage()]);
+            $steps['endpoint']['message'] = 'Error al consultar health: ' . $e->getMessage();
         }
+
+        return response()->json(['ok' => false, 'steps' => $steps]);
     }
 
     public function __invoke(Request $request): Response

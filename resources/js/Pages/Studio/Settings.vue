@@ -121,7 +121,7 @@ async function testRunPod() {
     testingRunpod.value = true
     runpodTest.value    = null
     try {
-        const res  = await fetch('/settings/runpod/ping', {
+        const res = await fetch('/settings/runpod/ping', {
             method:  'POST',
             headers: {
                 'X-Requested-With': 'XMLHttpRequest',
@@ -130,7 +130,10 @@ async function testRunPod() {
         })
         runpodTest.value = await res.json()
     } catch (e) {
-        runpodTest.value = { ok: false, message: 'Error de red: ' + e.message }
+        runpodTest.value = { ok: false, steps: {
+            api_key:  { ok: false, label: 'API Key',  message: 'Error de red: ' + e.message },
+            endpoint: { ok: false, label: 'Endpoint', message: 'No verificado' },
+        }}
     } finally {
         testingRunpod.value = false
     }
@@ -460,20 +463,16 @@ const TIMEZONES = [
                                 </span>
                             </div>
                         </div>
-                        <!-- RunPod test result -->
-                        <div v-if="key === 'runpod' && runpodTest" class="px-5 pb-4">
-                            <div class="flex items-start gap-2.5 rounded-xl px-3 py-2.5 text-xs"
-                                :class="runpodTest.ok ? 'bg-emerald-400/10 text-emerald-400' : 'bg-danger/10 text-danger'">
-                                <Wifi v-if="runpodTest.ok" class="w-3.5 h-3.5 mt-0.5 shrink-0" />
-                                <WifiOff v-else class="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                        <!-- RunPod test result — two steps -->
+                        <div v-if="key === 'runpod' && runpodTest" class="px-5 pb-4 space-y-1.5">
+                            <div v-for="(step, sk) in runpodTest.steps" :key="sk"
+                                class="flex items-start gap-2.5 rounded-xl px-3 py-2.5 text-xs"
+                                :class="step.ok ? 'bg-emerald-400/10 text-emerald-400' : 'bg-danger/10 text-danger'">
+                                <CheckCircle v-if="step.ok" class="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                                <XCircle v-else class="w-3.5 h-3.5 mt-0.5 shrink-0" />
                                 <div>
-                                    <p class="font-semibold">{{ runpodTest.ok ? 'Conexión exitosa' : 'Error de conexión' }}</p>
-                                    <p class="opacity-80 mt-0.5">{{ runpodTest.message }}</p>
-                                    <div v-if="runpodTest.raw && runpodTest.ok" class="mt-1.5 font-mono text-[10px] opacity-60 flex gap-3">
-                                        <span>ready: {{ runpodTest.raw.ready ?? 0 }}</span>
-                                        <span>idle: {{ runpodTest.raw.idle ?? 0 }}</span>
-                                        <span>running: {{ runpodTest.raw.running ?? 0 }}</span>
-                                    </div>
+                                    <p class="font-semibold">{{ step.label }}</p>
+                                    <p class="opacity-80 mt-0.5 font-mono">{{ step.message }}</p>
                                 </div>
                             </div>
                         </div>
