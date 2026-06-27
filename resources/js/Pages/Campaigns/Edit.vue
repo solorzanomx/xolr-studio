@@ -1,55 +1,33 @@
 <script setup>
 import { Head, Link, useForm } from '@inertiajs/vue3'
-import { computed } from 'vue'
+import { computed, watch } from 'vue'
 import AppLayout from '@/Layouts/AppLayout.vue'
-import { ChevronLeft, Image, Video, Mic, CheckSquare } from '@lucide/vue'
+import { ChevronLeft, Image, Video, Mic, CheckSquare, User } from '@lucide/vue'
 
-const props = defineProps({ campaign: Object, projects: Array })
+const props = defineProps({ campaign: Object, projects: Array, virtualTalents: Array })
 
 const form = useForm({
-    name:        props.campaign.name,
-    project_id:  props.campaign.project_id,
-    property_id: props.campaign.property_id ?? null,
-    type:        props.campaign.type,
-    description: props.campaign.description ?? '',
-    status:      props.campaign.status,
-    deadline:    props.campaign.deadline ?? '',
+    name:               props.campaign.name,
+    project_id:         props.campaign.project_id,
+    property_id:        props.campaign.property_id ?? null,
+    virtual_talent_id:  props.campaign.virtual_talent_id ?? null,
+    type:               props.campaign.type,
+    template:           props.campaign.template ?? 'launch',
+    description:        props.campaign.description ?? '',
+    status:             props.campaign.status,
+    deadline:           props.campaign.deadline ?? '',
+})
+
+// Sincronizar type con template
+watch(() => form.template, (t) => {
+    form.type = ['launch','available','tips','market_analysis','closing'].includes(t)
+        ? 'real_estate'
+        : t === 'youtube' ? 'youtube' : 'social'
 })
 
 const selectedProject = computed(() =>
     props.projects.find(p => String(p.id) === String(form.project_id))
 )
-
-const checklistPreview = computed(() => {
-    const templates = {
-        real_estate: [
-            { label: 'Render de fachada exterior', shot_type: 'image' },
-            { label: 'Interior — sala', shot_type: 'image' },
-            { label: 'Interior — cocina', shot_type: 'image' },
-            { label: 'Interior — recámara principal', shot_type: 'image' },
-            { label: 'Foto broker en propiedad', shot_type: 'image' },
-            { label: 'Video presentación 60s', shot_type: 'talking' },
-            { label: 'Carrusel frame 1', shot_type: 'image' },
-            { label: 'Carrusel frame 2', shot_type: 'image' },
-            { label: 'Carrusel frame 3', shot_type: 'image' },
-            { label: 'Story vertical 9:16', shot_type: 'image' },
-            { label: 'Thumbnail de reel', shot_type: 'image' },
-        ],
-        youtube: [
-            { label: 'Thumbnail principal', shot_type: 'image' },
-            { label: 'Thumbnail variante A', shot_type: 'image' },
-            { label: 'Thumbnail variante B', shot_type: 'image' },
-            { label: 'Intro del host', shot_type: 'talking' },
-            { label: 'Hero visual del destino', shot_type: 'image' },
-        ],
-        social: [
-            { label: 'Hero visual', shot_type: 'image' },
-            { label: 'Post principal', shot_type: 'image' },
-            { label: 'Story vertical', shot_type: 'image' },
-        ],
-    }
-    return templates[form.type] ?? templates.social
-})
 
 const shotIcon = { image: Image, video: Video, talking: Mic }
 
@@ -83,16 +61,35 @@ function submit() { form.put(`/campaigns/${props.campaign.id}`) }
                             </select>
                         </div>
                         <div>
-                            <label class="block text-xs font-medium text-text-secondary mb-1.5">Tipo *</label>
-                            <select v-model="form.type" class="w-full bg-surface-1 border border-border rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-amber transition-colors">
-                                <option value="real_estate">Inmobiliaria</option>
-                                <option value="product">Producto</option>
-                                <option value="brand">Marca</option>
-                                <option value="event">Evento</option>
-                                <option value="youtube">YouTube</option>
-                                <option value="social">Social Media</option>
+                            <label class="block text-xs font-medium text-text-secondary mb-1.5">Template de campaña *</label>
+                            <select v-model="form.template" class="w-full bg-surface-1 border border-border rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-amber transition-colors">
+                                <optgroup label="Home del Valle">
+                                    <option value="launch">Lanzamiento de desarrollo</option>
+                                    <option value="available">Propiedad disponible</option>
+                                    <option value="tips">Tips informativos (Sofía)</option>
+                                    <option value="market_analysis">Análisis de mercado (Diego)</option>
+                                    <option value="closing">Cierre exitoso</option>
+                                </optgroup>
+                                <optgroup label="Otros">
+                                    <option value="youtube">YouTube</option>
+                                    <option value="social">Social Media</option>
+                                </optgroup>
                             </select>
                         </div>
+                    </div>
+
+                    <!-- Virtual Talent -->
+                    <div>
+                        <label class="block text-xs font-medium text-text-secondary mb-1.5">
+                            <User class="w-3 h-3 inline mr-1" />
+                            Broker / Virtual Talent asignado
+                        </label>
+                        <select v-model="form.virtual_talent_id" class="w-full bg-surface-1 border border-border rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-amber transition-colors">
+                            <option :value="null">Sin asignar</option>
+                            <option v-for="vt in virtualTalents" :key="vt.virtual_talent?.id ?? vt.id" :value="vt.virtual_talent?.id ?? vt.id">
+                                {{ vt.virtual_talent?.name ?? vt.name }}
+                            </option>
+                        </select>
                     </div>
 
                     <!-- Propiedad (solo si hay proyecto seleccionado con propiedades) -->
@@ -134,21 +131,21 @@ function submit() { form.put(`/campaigns/${props.campaign.id}`) }
                     </div>
                 </form>
 
-                <!-- Checklist preview -->
-                <div class="bg-surface-1 border border-border rounded-xl p-4">
+                <!-- Checklist actual -->
+                <div class="bg-surface-1 border border-border rounded-xl p-4 h-fit">
                     <div class="flex items-center gap-2 mb-3">
                         <CheckSquare class="w-4 h-4 text-amber" />
                         <p class="text-xs font-medium text-text-secondary">Checklist actual</p>
                     </div>
                     <div class="space-y-1.5">
-                        <div v-for="item in campaign.asset_checklist ?? checklistPreview" :key="item.label ?? item.id" class="flex items-center gap-2">
+                        <div v-for="item in campaign.asset_checklist" :key="item.id ?? item.label" class="flex items-center gap-2">
                             <div class="w-3 h-3 rounded border border-border shrink-0" />
                             <component :is="shotIcon[item.shot_type]" class="w-3 h-3 text-text-muted shrink-0" />
                             <span class="text-[11px] text-text-secondary">{{ item.label }}</span>
                         </div>
                     </div>
                     <p class="text-[10px] text-text-muted mt-3">
-                        {{ (campaign.asset_checklist ?? checklistPreview).length }} assets
+                        {{ (campaign.asset_checklist ?? []).length }} assets
                     </p>
                 </div>
             </div>
