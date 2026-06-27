@@ -5,7 +5,8 @@ import AppLayout from '@/Layouts/AppLayout.vue'
 import {
     ArrowLeft, Wand2, Clock, Zap, Copy, Check,
     ChevronDown, History, UserPlus, UserMinus,
-    RefreshCw, Save, CheckCircle, XCircle, Loader, Image
+    RefreshCw, Save, CheckCircle, XCircle, Loader, Image,
+    Mic, Plus
 } from '@lucide/vue'
 
 const props = defineProps({
@@ -15,6 +16,7 @@ const props = defineProps({
     cameraStyles: Array,
     visualStyles: Array,
     formatPresets: Array,
+    audioAssets: Array,
 })
 
 // ────────────────────────────────────────────
@@ -93,11 +95,39 @@ onMounted(() => {
 })
 onUnmounted(() => clearInterval(pollInterval))
 
+// ── Lip Sync ─────────────────────────────────
+const talkingRenders    = computed(() => props.shot.talkingRenders ?? [])
+const completedRenders  = computed(() => renders.value.filter(r => r.status === 'completed'))
+const showLipSyncForm   = ref(false)
+
+const LIPSYNC_QUALITY = [
+    { key: 'draft',      label: 'Draft',      cost: '~$0.02/s', service: 'did' },
+    { key: 'production', label: 'Production', cost: '~$0.05/s', service: 'did' },
+    { key: 'premium',    label: 'Premium',    cost: '~$0.12/s', service: 'heygen' },
+]
+
+const lipSyncForm = useForm({
+    source_render_id: '',
+    audio_asset_id:   '',
+    quality:          'production',
+    service:          'did',
+})
+
+const submitLipSync = () => {
+    lipSyncForm.post(`/shots/${props.shot.id}/talking-renders`, {
+        preserveScroll: true,
+        onSuccess: () => { lipSyncForm.reset('source_render_id', 'audio_asset_id'); showLipSyncForm.value = false },
+    })
+}
+
+const approveTalkingRender = (id) => router.post(`/talking-renders/${id}/approve`, {}, { preserveScroll: true })
+const deleteTalkingRender  = (id) => router.delete(`/talking-renders/${id}`, { preserveScroll: true })
+
 // ────────────────────────────────────────────
 // Section collapse state
 // ────────────────────────────────────────────
 const showPromptHistory = ref(false)
-const showAddCharacter = ref(false)
+const showAddCharacter  = ref(false)
 
 // ────────────────────────────────────────────
 // Edit forms
@@ -494,6 +524,123 @@ const STATUS_COLORS = {
                                     </button>
                                 </div>
                             </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Lip Sync Engine -->
+            <div v-if="shot.shot_type === 'talking' || completedRenders.length" class="bg-surface-1 border border-border rounded-lg overflow-hidden">
+                <div class="flex items-center justify-between px-4 py-3 border-b border-border">
+                    <h3 class="text-sm font-semibold text-text-primary flex items-center gap-2">
+                        <Mic class="w-4 h-4 text-violet" />
+                        Lip Sync ({{ talkingRenders.length }})
+                    </h3>
+                    <button
+                        v-if="completedRenders.length && audioAssets?.length"
+                        @click="showLipSyncForm = !showLipSyncForm"
+                        class="text-xs text-text-muted hover:text-violet transition-colors flex items-center gap-1"
+                    >
+                        <Plus class="w-3.5 h-3.5" />
+                        Nuevo
+                    </button>
+                </div>
+
+                <!-- Form -->
+                <div v-if="showLipSyncForm" class="px-4 py-3 border-b border-border bg-surface-0 space-y-3">
+                    <div>
+                        <label class="block text-xs text-text-muted mb-1">Render fuente (imagen base)</label>
+                        <select v-model="lipSyncForm.source_render_id"
+                            class="w-full text-xs bg-surface-1 border border-border rounded px-2 py-1.5 text-text-primary focus:outline-none focus:border-violet/50">
+                            <option value="">— Selecciona un render —</option>
+                            <option v-for="r in completedRenders" :key="r.id" :value="r.id">
+                                Render #{{ r.id }} · {{ r.quality_tier }}
+                            </option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs text-text-muted mb-1">Audio (voice-over o diálogo)</label>
+                        <select v-model="lipSyncForm.audio_asset_id"
+                            class="w-full text-xs bg-surface-1 border border-border rounded px-2 py-1.5 text-text-primary focus:outline-none focus:border-violet/50">
+                            <option value="">— Selecciona un audio —</option>
+                            <option v-for="a in audioAssets" :key="a.id" :value="a.id">
+                                {{ a.name }} ({{ a.duration_seconds ? Math.round(a.duration_seconds) + 's' : '?' }})
+                            </option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs text-text-muted mb-2">Calidad</label>
+                        <div class="flex gap-2">
+                            <button v-for="q in LIPSYNC_QUALITY" :key="q.key"
+                                @click="lipSyncForm.quality = q.key; lipSyncForm.service = q.service"
+                                :class="[
+                                    'flex-1 text-xs rounded-lg border py-2 transition-all',
+                                    lipSyncForm.quality === q.key
+                                        ? 'border-violet/40 bg-violet/10 text-violet'
+                                        : 'border-border bg-surface-0 text-text-muted hover:text-text-primary'
+                                ]"
+                            >
+                                <p class="font-semibold">{{ q.label }}</p>
+                                <p class="opacity-60 text-[10px]">{{ q.cost }}</p>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="flex gap-2 justify-end">
+                        <button @click="showLipSyncForm = false" class="text-xs text-text-muted hover:text-text-primary px-3 py-1.5">Cancelar</button>
+                        <button @click="submitLipSync"
+                            :disabled="!lipSyncForm.source_render_id || !lipSyncForm.audio_asset_id || lipSyncForm.processing"
+                            class="flex items-center gap-1.5 text-xs bg-violet/10 text-violet hover:bg-violet/20 disabled:opacity-40 transition-colors px-3 py-1.5 rounded-md font-medium">
+                            <Zap class="w-3 h-3" />
+                            Encolar lip sync
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Sin renders o audio disponibles -->
+                <div v-if="!completedRenders.length || !audioAssets?.length" class="px-4 py-4 text-center">
+                    <p class="text-xs text-text-muted">
+                        {{ !completedRenders.length ? 'Necesitas un render completado como base.' : 'Genera un voice-over en Audio Studio primero.' }}
+                    </p>
+                </div>
+
+                <!-- Galería de talking renders -->
+                <div v-if="talkingRenders.length" class="divide-y divide-border">
+                    <div v-for="tr in talkingRenders" :key="tr.id" class="p-4 flex items-start gap-3">
+                        <!-- Thumbnail / estado -->
+                        <div class="w-20 h-14 bg-surface-2 rounded-lg flex items-center justify-center shrink-0 overflow-hidden">
+                            <video v-if="tr.status === 'completed' && tr.file_path"
+                                :src="tr.file_path.startsWith('http') ? tr.file_path : `/storage/${tr.file_path}`"
+                                class="w-full h-full object-cover"
+                                muted
+                            />
+                            <Loader v-else-if="['queued','processing'].includes(tr.status)" class="w-5 h-5 text-amber animate-spin" />
+                            <XCircle v-else-if="tr.status === 'failed'" class="w-5 h-5 text-red-400" />
+                            <Mic v-else class="w-5 h-5 text-text-muted opacity-30" />
+                        </div>
+                        <!-- Info -->
+                        <div class="flex-1 min-w-0 space-y-1">
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <span :class="['text-xs px-1.5 py-0.5 rounded font-mono', RENDER_STATUS[tr.status]?.class ?? 'text-text-muted bg-surface-3']">
+                                    {{ RENDER_STATUS[tr.status]?.label ?? tr.status }}
+                                </span>
+                                <span class="text-xs text-text-muted capitalize">{{ tr.quality }}</span>
+                                <span class="text-xs text-violet">{{ tr.service }}</span>
+                                <CheckCircle v-if="tr.is_approved" class="w-3.5 h-3.5 text-green-400" />
+                            </div>
+                            <p class="text-xs text-text-muted truncate">{{ tr.audio_asset?.name }}</p>
+                            <p v-if="tr.service_cost_usd" class="text-xs font-mono text-text-muted">${{ Number(tr.service_cost_usd).toFixed(4) }}</p>
+                        </div>
+                        <!-- Acciones -->
+                        <div class="flex flex-col gap-1 shrink-0">
+                            <button v-if="tr.status === 'completed' && !tr.is_approved"
+                                @click="approveTalkingRender(tr.id)"
+                                class="text-xs bg-green-500/10 text-green-400 hover:bg-green-500/20 px-2 py-1 rounded font-medium transition-colors">
+                                Aprobar
+                            </button>
+                            <button @click="deleteTalkingRender(tr.id)"
+                                class="text-xs text-text-muted hover:text-red-400 transition-colors px-2 py-1">
+                                <XCircle class="w-3.5 h-3.5" />
+                            </button>
                         </div>
                     </div>
                 </div>

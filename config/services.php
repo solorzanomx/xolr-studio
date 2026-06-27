@@ -41,6 +41,12 @@ return [
         'max_tokens' => (int) env('ANTHROPIC_MAX_TOKENS', 8192),
     ],
 
+    'did' => [
+        'api_key'        => env('DID_API_KEY'),
+        'webhook_secret' => env('DID_WEBHOOK_SECRET'),
+        'mock_mode'      => (bool) env('DID_MOCK_MODE', false),
+    ],
+
     'elevenlabs' => [
         'api_key'          => env('ELEVENLABS_API_KEY'),
         'default_voice_id' => env('ELEVENLABS_DEFAULT_VOICE_ID', 'EXAVITQu4vr4xnSDxMaL'),

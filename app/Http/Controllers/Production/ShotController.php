@@ -32,7 +32,8 @@ class ShotController extends Controller
             'visualStyle',
             'formatPreset',
             'prompts',
-            'renders' => fn($q) => $q->orderByDesc('created_at'),
+            'renders'        => fn($q) => $q->orderByDesc('created_at'),
+            'talkingRenders' => fn($q) => $q->with(['audioAsset:id,name,file_path', 'sourceRender:id,quality_tier'])->orderByDesc('created_at'),
         ]);
 
         // Determinar el contexto del shot para breadcrumb de regreso
@@ -49,9 +50,13 @@ class ShotController extends Controller
                 ->where('is_active', true)
                 ->orderBy('name')
                 ->get(['id', 'name', 'type', 'base_prompt', 'lora_trigger_word']),
-            'cameraStyles'  => CameraStyle::where('is_active', true)->orderBy('name')->get(['id', 'name', 'prompt_fragment']),
-            'visualStyles'  => VisualStyle::where('is_active', true)->orderBy('name')->get(['id', 'name', 'description']),
-            'formatPresets' => FormatPreset::where('is_active', true)->orderBy('name')->get(['id', 'name', 'width', 'height', 'aspect_ratio', 'platform']),
+            'cameraStyles'   => CameraStyle::where('is_active', true)->orderBy('name')->get(['id', 'name', 'prompt_fragment']),
+            'visualStyles'   => VisualStyle::where('is_active', true)->orderBy('name')->get(['id', 'name', 'description']),
+            'formatPresets'  => FormatPreset::where('is_active', true)->orderBy('name')->get(['id', 'name', 'width', 'height', 'aspect_ratio', 'platform']),
+            'audioAssets'    => \App\Models\AudioAsset::where('status', 'completed')
+                ->whereIn('type', ['voice_over', 'dialogue'])
+                ->orderByDesc('created_at')
+                ->get(['id', 'name', 'duration_seconds', 'type']),
         ]);
     }
 

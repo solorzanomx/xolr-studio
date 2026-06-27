@@ -23,6 +23,7 @@ use App\Http\Controllers\ContentMachine\VideoSeriesController;
 use App\Http\Controllers\ContentMachine\VideoHookController;
 use App\Http\Controllers\Audio\AudioAssetController;
 use App\Http\Controllers\Audio\VoiceProfileController;
+use App\Http\Controllers\Production\TalkingRenderController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth', 'verified'])->group(function (): void {
@@ -84,6 +85,12 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
     Route::post('shots/{shot}/renders', [RenderController::class, 'store'])->name('shots.renders.store');
     Route::post('renders/{render}/approve', [RenderController::class, 'approve'])->name('renders.approve');
     Route::delete('renders/{render}', [RenderController::class, 'destroy'])->name('renders.destroy');
+
+    // Talking renders (Lip Sync)
+    Route::post('shots/{shot}/talking-renders', [TalkingRenderController::class, 'store'])->name('shots.talking-renders.store');
+    Route::post('talking-renders/{talkingRender}/approve', [TalkingRenderController::class, 'approve'])->name('talking-renders.approve');
+    Route::delete('talking-renders/{talkingRender}', [TalkingRenderController::class, 'destroy'])->name('talking-renders.destroy');
+    Route::post('talking-renders/estimate-cost', [TalkingRenderController::class, 'estimateCost'])->name('talking-renders.estimate-cost');
 
     // Properties (nested bajo proyecto)
     Route::post('projects/{project}/properties', [PropertyController::class, 'store'])->name('projects.properties.store');
