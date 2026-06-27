@@ -70,7 +70,7 @@ class RunPodAdapter implements RenderFarmContract
         try {
             $response = Http::withToken($this->apiKey)
                 ->timeout(30)
-                ->post("{$this->BASE_URL}/{$endpointId}/run", $payload);
+                ->post("{$this->baseUrl()}/{$endpointId}/run", $payload);
 
             if ($response->failed()) {
                 throw new RuntimeException(
@@ -108,7 +108,7 @@ class RunPodAdapter implements RenderFarmContract
         try {
             $response = Http::withToken($this->apiKey)
                 ->timeout(15)
-                ->get("{$this->BASE_URL}/{$endpointId}/status/{$render->job_id}");
+                ->get("{$this->baseUrl()}/{$endpointId}/status/{$render->job_id}");
 
             if ($response->failed()) {
                 return new RenderStatusResult(
@@ -163,7 +163,7 @@ class RunPodAdapter implements RenderFarmContract
 
         $response = Http::withToken($this->apiKey)
             ->timeout(10)
-            ->post("{$this->BASE_URL}/{$endpointId}/cancel/{$render->job_id}");
+            ->post("{$this->baseUrl()}/{$endpointId}/cancel/{$render->job_id}");
 
         return $response->successful();
     }
@@ -319,6 +319,11 @@ class RunPodAdapter implements RenderFarmContract
     }
 
     // ─── Helpers ─────────────────────────────────────────────────────────────
+
+    private function baseUrl(): string
+    {
+        return self::BASE_URL;
+    }
 
     private function resolveEndpoint(Render $render): string
     {
