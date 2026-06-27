@@ -16,11 +16,12 @@ class RunPodAdapter implements RenderFarmContract
     private const BASE_URL = 'https://api.runpod.io/v2';
 
     private const TIER_PARAMS = [
+        // draft usa Dev con pasos reducidos — Schnell requiere endpoint custom
         'draft' => [
-            'model'     => 'schnell',
-            'steps'     => 4,
-            'scheduler' => 'simple',
-            'guidance'  => null,    // Schnell no usa guidance
+            'model'     => 'dev',
+            'steps'     => 12,
+            'scheduler' => 'beta',
+            'guidance'  => 3.5,
         ],
         'standard' => [
             'model'     => 'dev',
@@ -181,9 +182,7 @@ class RunPodAdapter implements RenderFarmContract
 
         $positivePrompt = $prompt?->positive_prompt ?? '';
 
-        $workflow = $params['model'] === 'schnell'
-            ? $this->schnellWorkflow($positivePrompt, $seed, $width, $height, $params['steps'])
-            : $this->devWorkflow($positivePrompt, $seed, $width, $height, $params['steps'], $params['guidance'] ?? 3.5);
+        $workflow = $this->devWorkflow($positivePrompt, $seed, $width, $height, $params['steps'], $params['guidance'] ?? 3.5);
 
         $payload = [
             'input' => ['workflow' => $workflow],
