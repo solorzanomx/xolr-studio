@@ -29,6 +29,8 @@ use App\Http\Controllers\Production\ScriptGeneratorController;
 use App\Http\Controllers\Intelligence\IntelligenceController;
 use App\Http\Controllers\Publishing\ExportController;
 use App\Http\Controllers\Publishing\PrintController;
+use App\Http\Controllers\Social\CalendarController;
+use App\Http\Controllers\Analytics\AnalyticsController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth', 'verified'])->group(function (): void {
@@ -128,6 +130,17 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
         Route::put('/hooks/{hook}', [VideoHookController::class, 'update'])->name('hooks.update');
         Route::delete('/hooks/{hook}', [VideoHookController::class, 'destroy'])->name('hooks.destroy');
     });
+
+    // Calendar & Social Posts
+    Route::get('/calendar', [CalendarController::class, 'index'])->name('calendar');
+    Route::post('/social-posts', [CalendarController::class, 'store'])->name('social-posts.store');
+    Route::put('/social-posts/{socialPost}', [CalendarController::class, 'update'])->name('social-posts.update');
+    Route::delete('/social-posts/{socialPost}', [CalendarController::class, 'destroy'])->name('social-posts.destroy');
+    Route::post('/social-posts/{socialPost}/publish', [CalendarController::class, 'publishNow'])->name('social-posts.publish');
+
+    // Analytics
+    Route::get('/analytics', [AnalyticsController::class, 'index'])->name('analytics');
+    Route::post('/analytics/sync', [AnalyticsController::class, 'syncNow'])->name('analytics.sync');
 
     // Publishing Engine
     Route::get('/projects/{project}/publishing', [ExportController::class, 'index'])->name('projects.publishing');

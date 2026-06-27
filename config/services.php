@@ -74,4 +74,23 @@ return [
         ],
     ],
 
+    'instagram' => [
+        'access_token' => env('INSTAGRAM_ACCESS_TOKEN'),
+        'account_id'   => env('INSTAGRAM_ACCOUNT_ID'),
+        'mock_mode'    => (bool) env('INSTAGRAM_MOCK_MODE', true),
+    ],
+
+    'youtube' => [
+        'access_token'  => env('YOUTUBE_ACCESS_TOKEN'),
+        'refresh_token' => env('YOUTUBE_REFRESH_TOKEN'),
+        'client_id'     => env('YOUTUBE_CLIENT_ID'),
+        'client_secret' => env('YOUTUBE_CLIENT_SECRET'),
+        'mock_mode'     => (bool) env('YOUTUBE_MOCK_MODE', true),
+    ],
+
+    'notion' => [
+        'token'     => env('NOTION_TOKEN'),
+        'mock_mode' => (bool) env('NOTION_MOCK_MODE', true),
+    ],
+
 ];

@@ -52,8 +52,8 @@ const navSections = [
     {
         label: 'Publicación',
         items: [
-            { label: 'Calendario', href: '/calendar', icon: 'calendar', soon: true },
-            { label: 'Analytics', href: '/analytics', icon: 'trending-up', soon: true },
+            { label: 'Calendario', href: '/calendar', icon: 'calendar' },
+            { label: 'Analytics', href: '/analytics', icon: 'trending-up' },
         ],
     },
     {
