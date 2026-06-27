@@ -12,6 +12,8 @@ class VirtualTalent extends Model
 {
     use HasFactory;
 
+    protected $table = 'virtual_talents';
+
     protected $guarded = [];
 
     protected function casts(): array
