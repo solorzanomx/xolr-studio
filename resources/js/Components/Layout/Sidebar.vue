@@ -29,6 +29,7 @@ const navSections = [
         label: 'Producción',
         items: [
             { label: 'Proyectos', href: '/projects', icon: 'folder' },
+            { label: 'Campañas', href: '/campaigns', icon: 'megaphone' },
             { label: 'Shots', href: '/shots', icon: 'camera', soon: true },
             { label: 'Renders', href: '/renders', icon: 'image', soon: true },
         ],

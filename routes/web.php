@@ -15,6 +15,8 @@ use App\Http\Controllers\Production\SeasonController;
 use App\Http\Controllers\Production\EpisodeController;
 use App\Http\Controllers\Production\SceneController;
 use App\Http\Controllers\Production\ShotController;
+use App\Http\Controllers\Production\PropertyController;
+use App\Http\Controllers\Production\CampaignController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth', 'verified'])->group(function (): void {
@@ -65,6 +67,16 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
     Route::post('scenes/{scene}/shots', [ShotController::class, 'store'])->name('scenes.shots.store');
     Route::put('shots/{shot}', [ShotController::class, 'update'])->name('shots.update');
     Route::delete('shots/{shot}', [ShotController::class, 'destroy'])->name('shots.destroy');
+
+    // Properties (nested bajo proyecto)
+    Route::post('projects/{project}/properties', [PropertyController::class, 'store'])->name('projects.properties.store');
+    Route::get('properties/{property}/edit', [PropertyController::class, 'edit'])->name('properties.edit');
+    Route::put('properties/{property}', [PropertyController::class, 'update'])->name('properties.update');
+    Route::delete('properties/{property}', [PropertyController::class, 'destroy'])->name('properties.destroy');
+
+    // Campaigns
+    Route::resource('campaigns', CampaignController::class);
+    Route::post('campaigns/{campaign}/generate-shots', [CampaignController::class, 'generateShots'])->name('campaigns.generate-shots');
 });
 
 require __DIR__.'/auth.php';
