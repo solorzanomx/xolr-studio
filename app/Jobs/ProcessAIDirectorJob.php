@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Jobs;
 
 use App\Models\AIDirectorResult;
+use App\Models\User;
+use App\Notifications\AIDirectorCompletedNotification;
 use App\Services\AIDirectorService;
 use App\Services\GhostDirectorService;
 use Illuminate\Bus\Queueable;
@@ -43,13 +45,16 @@ class ProcessAIDirectorJob implements ShouldQueue
             'proposed_structure'      => $structure,
             'ghost_profile_snapshot'  => $ghostProfile,
         ]);
+
+        User::all()->each(fn($u) => $u->notify(new AIDirectorCompletedNotification($result->fresh())));
     }
 
     public function failed(Throwable $e): void
     {
-        AIDirectorResult::where('id', $this->resultId)->update([
-            'status'        => 'failed',
-            'error_message' => $e->getMessage(),
-        ]);
+        $result = AIDirectorResult::where('id', $this->resultId)->first();
+        $result?->update(['status' => 'failed', 'error_message' => $e->getMessage()]);
+        if ($result) {
+            User::all()->each(fn($u) => $u->notify(new AIDirectorCompletedNotification($result)));
+        }
     }
 }

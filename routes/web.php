@@ -30,6 +30,7 @@ use App\Http\Controllers\Intelligence\IntelligenceController;
 use App\Http\Controllers\Publishing\ExportController;
 use App\Http\Controllers\Publishing\PrintController;
 use App\Http\Controllers\Budget\BudgetController;
+use App\Http\Controllers\Notifications\NotificationController;
 use App\Http\Controllers\Social\CalendarController;
 use App\Http\Controllers\Analytics\AnalyticsController;
 use Illuminate\Support\Facades\Route;
@@ -144,6 +145,13 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
     // Analytics
     Route::get('/analytics', [AnalyticsController::class, 'index'])->name('analytics');
     Route::post('/analytics/sync', [AnalyticsController::class, 'syncNow'])->name('analytics.sync');
+
+    // Notifications
+    Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications');
+    Route::post('/notifications/{id}/read', [NotificationController::class, 'markRead'])->name('notifications.read');
+    Route::post('/notifications/read-all', [NotificationController::class, 'markAllRead'])->name('notifications.read-all');
+    Route::delete('/notifications/{id}', [NotificationController::class, 'destroy'])->name('notifications.destroy');
+    Route::delete('/notifications', [NotificationController::class, 'destroyAll'])->name('notifications.destroy-all');
 
     // Budget
     Route::get('/budget', [BudgetController::class, 'index'])->name('budget');

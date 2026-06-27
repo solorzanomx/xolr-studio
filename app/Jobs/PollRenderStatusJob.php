@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Jobs;
 
 use App\Models\Render;
+use App\Models\User;
+use App\Notifications\RenderCompletedNotification;
 use App\Services\RenderFarm\RenderFarmContract;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -93,6 +95,7 @@ class PollRenderStatusJob implements ShouldQueue
             'metadata'    => array_merge($this->render->metadata ?? [], ['completed_raw' => $raw]),
         ]);
 
+        $this->notifyUsers();
         Log::info('Render completado', ['render_id' => $this->render->id, 'cost_usd' => $costUsd]);
     }
 
@@ -113,6 +116,11 @@ class PollRenderStatusJob implements ShouldQueue
             Log::warning('No se pudo descargar el render', ['url' => $url, 'error' => $e->getMessage()]);
             return null;
         }
+    }
+
+    private function notifyUsers(): void
+    {
+        User::all()->each(fn($u) => $u->notify(new RenderCompletedNotification($this->render->fresh())));
     }
 
     // Smart retry: reintenta con seed diferente si falla

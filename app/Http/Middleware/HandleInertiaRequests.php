@@ -35,13 +35,28 @@ class HandleInertiaRequests extends Middleware
                 'user' => $request->user(),
             ],
             'flash' => [
-                'success'          => $request->session()->get('success'),
-                'error'            => $request->session()->get('error'),
-                'info'             => $request->session()->get('info'),
+                'success'           => $request->session()->get('success'),
+                'error'             => $request->session()->get('error'),
+                'info'              => $request->session()->get('info'),
                 'book_chapter'      => $request->session()->get('book_chapter'),
                 'continuity_result' => $request->session()->get('continuity_result'),
                 'continuity_check'  => $request->session()->get('continuity_check'),
             ],
+            'unreadNotifications' => $request->user()
+                ?->unreadNotifications()
+                ->limit(5)
+                ->get()
+                ->map(fn($n) => [
+                    'id'         => $n->id,
+                    'type'       => $n->data['type']  ?? 'info',
+                    'icon'       => $n->data['icon']  ?? 'bell',
+                    'title'      => $n->data['title'] ?? '',
+                    'body'       => $n->data['body']  ?? '',
+                    'url'        => $n->data['url']   ?? null,
+                    'created_at' => $n->created_at->diffForHumans(),
+                ])
+                ->toArray() ?? [],
+            'unreadCount' => $request->user()?->unreadNotifications()->count() ?? 0,
         ];
     }
 }

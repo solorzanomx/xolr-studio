@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Jobs;
 
 use App\Models\SocialPost;
+use App\Models\User;
+use App\Notifications\PostPublishedNotification;
 use App\Services\Social\InstagramAdapter;
 use App\Services\Social\SocialPostContract;
 use App\Services\Social\YouTubeAdapter;
@@ -50,6 +52,8 @@ class PublishSocialPostJob implements ShouldQueue
         if ($post->calendar_event_id) {
             $post->calendarEvent?->update(['status' => 'published']);
         }
+
+        User::all()->each(fn($u) => $u->notify(new PostPublishedNotification($post)));
     }
 
     private function resolveAdapter(string $platform): SocialPostContract
@@ -63,9 +67,10 @@ class PublishSocialPostJob implements ShouldQueue
 
     public function failed(Throwable $e): void
     {
-        SocialPost::where('id', $this->postId)->update([
-            'status'        => 'failed',
-            'error_message' => $e->getMessage(),
-        ]);
+        $post = SocialPost::where('id', $this->postId)->first();
+        $post?->update(['status' => 'failed', 'error_message' => $e->getMessage()]);
+        if ($post) {
+            User::all()->each(fn($u) => $u->notify(new PostPublishedNotification($post)));
+        }
     }
 }
