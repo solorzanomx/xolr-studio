@@ -3,8 +3,8 @@ import { Head, Link, useForm, router } from '@inertiajs/vue3'
 import { ref, computed } from 'vue'
 import AppLayout from '@/Layouts/AppLayout.vue'
 import {
-    ArrowLeft, Star, Sparkles, Edit2, Trash2, Plus, Image,
-    Youtube, Tag, Clock, ChevronDown, ChevronUp, Check, Copy,
+    ArrowLeft, Star, Sparkles, Pencil, Trash2, Plus, Image,
+    Video, Tag, Clock, ChevronDown, ChevronUp, Check, Copy,
     Loader2
 } from '@lucide/vue'
 
@@ -123,7 +123,7 @@ const statusLabels = { idea: 'Idea', scripted: 'Guionizado', production: 'Produc
                         {{ generating ? 'Generando...' : 'Generar con IA' }}
                     </button>
                     <button @click="editingMeta = !editingMeta" class="p-2 text-text-muted hover:text-text-primary bg-surface-1 border border-border rounded-lg transition-colors">
-                        <Edit2 class="w-4 h-4" />
+                        <Pencil class="w-4 h-4" />
                     </button>
                     <Link :href="`/content-machine/concepts/${concept.id}/edit`" class="p-2 text-text-muted hover:text-danger bg-surface-1 border border-border rounded-lg transition-colors">
                         <Trash2 class="w-4 h-4" />
@@ -278,7 +278,7 @@ const statusLabels = { idea: 'Idea', scripted: 'Guionizado', production: 'Produc
                     class="w-full flex items-center justify-between px-5 py-4 hover:bg-surface-2 transition-colors"
                 >
                     <div class="flex items-center gap-2">
-                        <Youtube class="w-4 h-4 text-danger" />
+                        <Video class="w-4 h-4 text-danger" />
                         <span class="text-sm font-semibold text-text-primary">SEO Assistant</span>
                         <span class="text-xs font-mono text-success">✓ generado</span>
                     </div>
