@@ -82,17 +82,19 @@ class PollRenderStatusJob implements ShouldQueue
 
     private function handleCompleted(?string $fileUrl, ?float $costUsd, array $raw): void
     {
-        $filePath = null;
+        // El adapter ya pudo haber guardado el archivo (base64 → storage)
+        // y devuelto un path local. Solo descargamos si es una URL externa.
+        $filePath = $fileUrl;
 
-        if ($fileUrl) {
+        if ($fileUrl && str_starts_with($fileUrl, 'http')) {
             $filePath = $this->downloadAndStore($fileUrl);
         }
 
         $this->render->update([
-            'status'      => 'completed',
-            'file_path'   => $filePath ?? $fileUrl,
-            'gpu_cost_usd'=> $costUsd,
-            'metadata'    => array_merge($this->render->metadata ?? [], ['completed_raw' => $raw]),
+            'status'       => 'completed',
+            'file_path'    => $filePath ?? $fileUrl,
+            'gpu_cost_usd' => $costUsd,
+            'metadata'     => array_merge($this->render->metadata ?? [], ['completed_raw' => $raw]),
         ]);
 
         $this->notifyUsers();
@@ -107,7 +109,7 @@ class PollRenderStatusJob implements ShouldQueue
                 return null;
             }
 
-            $ext  = str_contains($url, '.mp4') ? 'mp4' : 'webp';
+            $ext  = str_contains($url, '.mp4') ? 'mp4' : 'png';
             $path = "renders/{$this->render->shot_id}/{$this->render->id}.{$ext}";
             Storage::disk('public')->put($path, $contents);
 
