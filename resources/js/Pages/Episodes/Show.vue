@@ -448,6 +448,9 @@ const epStatusLabel = {
                                 <span v-if="shot.duration_seconds" class="text-[9px] font-mono text-text-muted mt-1 block">{{ shot.duration_seconds }}s</span>
                                 <!-- Botones hover -->
                                 <div class="absolute top-1 right-1 flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <Link :href="`/shots/${shot.id}`" class="p-0.5 text-text-muted hover:text-violet transition-colors" title="Abrir shot">
+                                        <Camera class="w-3 h-3" />
+                                    </Link>
                                     <button @click="openEditShot(shot)" class="p-0.5 text-text-muted hover:text-amber transition-colors">
                                         <Pencil class="w-3 h-3" />
                                     </button>

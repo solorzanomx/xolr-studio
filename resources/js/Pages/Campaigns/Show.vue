@@ -176,7 +176,12 @@ const templateLabel = {
                         Shots generados ({{ campaign.shots.length }})
                     </h2>
                     <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                        <div v-for="shot in campaign.shots" :key="shot.id" class="bg-surface-1 border border-border rounded-xl p-3">
+                        <Link
+                            v-for="shot in campaign.shots"
+                            :key="shot.id"
+                            :href="`/shots/${shot.id}`"
+                            class="bg-surface-1 border border-border rounded-xl p-3 hover:border-amber/40 transition-colors block"
+                        >
                             <div class="flex items-center justify-between mb-2">
                                 <span class="text-[10px] font-mono text-amber font-bold">S{{ String(shot.number).padStart(2, '0') }}</span>
                                 <component :is="{ image: Image, video: Video, talking: Mic }[shot.shot_type]" class="w-3.5 h-3.5 text-text-muted" />
@@ -185,7 +190,7 @@ const templateLabel = {
                             <span :class="['text-[10px] font-mono mt-1 block', shot.shot_type === 'talking' ? 'text-violet' : 'text-text-muted']">
                                 {{ shot.shot_type }}
                             </span>
-                        </div>
+                        </Link>
                     </div>
                 </div>
             </div>
