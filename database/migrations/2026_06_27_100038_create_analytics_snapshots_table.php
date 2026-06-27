@@ -28,7 +28,7 @@ return new class extends Migration
             $table->decimal('engagement_rate', 5, 4)->nullable();
             $table->integer('subscribers_gained')->nullable();
             $table->timestamp('created_at')->nullable();
-            $table->index(['platform', 'platform_post_id', 'snapshot_date']);
+            $table->index(['platform', 'platform_post_id', 'snapshot_date'], 'analytics_platform_idx');
         });
     }
 
