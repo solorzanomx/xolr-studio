@@ -27,6 +27,8 @@ use App\Http\Controllers\Production\TalkingRenderController;
 use App\Http\Controllers\Production\AIDirectorController;
 use App\Http\Controllers\Production\ScriptGeneratorController;
 use App\Http\Controllers\Intelligence\IntelligenceController;
+use App\Http\Controllers\Publishing\ExportController;
+use App\Http\Controllers\Publishing\PrintController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth', 'verified'])->group(function (): void {
@@ -126,6 +128,18 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
         Route::put('/hooks/{hook}', [VideoHookController::class, 'update'])->name('hooks.update');
         Route::delete('/hooks/{hook}', [VideoHookController::class, 'destroy'])->name('hooks.destroy');
     });
+
+    // Publishing Engine
+    Route::get('/projects/{project}/publishing', [ExportController::class, 'index'])->name('projects.publishing');
+    Route::post('/projects/{project}/publishing/zip', [ExportController::class, 'storeZip'])->name('projects.publishing.zip');
+    Route::post('/projects/{project}/publishing/animatic', [ExportController::class, 'storeAnimatic'])->name('projects.publishing.animatic');
+    Route::get('/publishing/episodes/{episode}/animatic-slides', [ExportController::class, 'getAnimaticSlides'])->name('publishing.animatic-slides');
+    Route::get('/publishing/exports/{export}/download', [ExportController::class, 'download'])->name('publishing.exports.download');
+    Route::delete('/publishing/exports/{export}', [ExportController::class, 'destroy'])->name('publishing.exports.destroy');
+
+    // Print views (Blade, not Inertia)
+    Route::get('/projects/{project}/print/bible', [PrintController::class, 'bible'])->name('projects.print.bible');
+    Route::get('/seasons/{season}/print/book', [PrintController::class, 'book'])->name('seasons.print.book');
 
     // Intelligence Engine
     Route::get('/projects/{project}/intelligence', [IntelligenceController::class, 'show'])->name('projects.intelligence');
