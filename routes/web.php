@@ -30,6 +30,7 @@ use App\Http\Controllers\Intelligence\IntelligenceController;
 use App\Http\Controllers\Publishing\ExportController;
 use App\Http\Controllers\Publishing\PrintController;
 use App\Http\Controllers\Budget\BudgetController;
+use App\Http\Controllers\Profile\ProfileController;
 use App\Http\Controllers\Notifications\NotificationController;
 use App\Http\Controllers\Share\PreviewController;
 use App\Http\Controllers\Share\ShareController;
@@ -44,6 +45,13 @@ Route::post('/preview/{token}/auth', [PreviewController::class, 'authenticate'])
 Route::middleware(['auth', 'verified'])->group(function (): void {
     Route::get('/', DashboardController::class)->name('dashboard');
     Route::get('/settings', SettingsController::class)->name('settings');
+
+    // Profile
+    Route::put('/profile', [ProfileController::class, 'update'])->name('profile.update');
+    Route::put('/profile/password', [ProfileController::class, 'updatePassword'])->name('profile.password');
+    Route::get('/profile/sessions', [ProfileController::class, 'sessions'])->name('profile.sessions');
+    Route::delete('/profile/sessions/{sessionId}', [ProfileController::class, 'destroySession'])->name('profile.sessions.destroy');
+    Route::delete('/profile/sessions', [ProfileController::class, 'destroyOtherSessions'])->name('profile.sessions.destroy-all');
 
     Route::prefix('library')->name('library.')->group(function (): void {
         Route::resource('characters', CharacterController::class);

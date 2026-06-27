@@ -21,11 +21,11 @@ class User extends Authenticatable
     protected function casts(): array
     {
         return [
-            'email_verified_at' => 'datetime',
-            'password'                => 'hashed',
-            'preferences'             => 'array',
-            'ghost_director_profile'  => 'array',
-            'last_active_at'          => 'datetime',
+            'email_verified_at'      => 'datetime',
+            'last_active_at'         => 'datetime',
+            'password'               => 'hashed',
+            'preferences'            => 'array',
+            'ghost_director_profile' => 'array',
         ];
     }
 
