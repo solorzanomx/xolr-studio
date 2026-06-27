@@ -19,7 +19,7 @@ class CampaignController extends Controller
 {
     public function index(Request $request): Response
     {
-        $campaigns = Campaign::with(['project:id,name', 'property:id,name,type', 'virtualTalent:id,name,character_id'])
+        $campaigns = Campaign::with(['project:id,name', 'property:id,name,type', 'virtualTalent:id,character_id'])
             ->withCount('shots')
             ->when($request->search,  fn($q, $v) => $q->where('name', 'like', "%{$v}%"))
             ->when($request->project, fn($q, $v) => $q->where('project_id', $v))
@@ -41,7 +41,7 @@ class CampaignController extends Controller
     {
         return Inertia::render('Campaigns/Create', [
             'projects'       => Project::with('properties:id,project_id,name,type')->get(['id', 'name', 'type']),
-            'virtualTalents' => Character::whereHas('virtualTalent')->with('virtualTalent:id,character_id,name')->get(['id', 'name']),
+            'virtualTalents' => Character::whereHas('virtualTalent')->with('virtualTalent:id,character_id')->get(['id', 'name']),
         ]);
     }
 
@@ -73,7 +73,7 @@ class CampaignController extends Controller
         $campaign->load([
             'project:id,name,type',
             'property:id,name,type,location_description,price,currency,bedrooms,bathrooms,area_sqm',
-            'virtualTalent:id,character_id,name',
+            'virtualTalent:id,character_id',
             'virtualTalent.character:id,name',
             'shots' => fn($q) => $q->orderBy('sort_order')->orderBy('number'),
         ]);
@@ -96,9 +96,9 @@ class CampaignController extends Controller
     public function edit(Campaign $campaign): Response
     {
         return Inertia::render('Campaigns/Edit', [
-            'campaign'       => $campaign->load(['project:id,name', 'virtualTalent:id,character_id,name']),
+            'campaign'       => $campaign->load(['project:id,name', 'virtualTalent:id,character_id']),
             'projects'       => Project::with('properties:id,project_id,name,type')->get(['id', 'name', 'type']),
-            'virtualTalents' => Character::whereHas('virtualTalent')->with('virtualTalent:id,character_id,name')->get(['id', 'name']),
+            'virtualTalents' => Character::whereHas('virtualTalent')->with('virtualTalent:id,character_id')->get(['id', 'name']),
         ]);
     }
 
