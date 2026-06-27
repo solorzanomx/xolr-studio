@@ -35,4 +35,10 @@ return [
         ],
     ],
 
+    'anthropic' => [
+        'key'        => env('ANTHROPIC_API_KEY'),
+        'model'      => env('ANTHROPIC_MODEL', 'claude-sonnet-4-6'),
+        'max_tokens' => (int) env('ANTHROPIC_MAX_TOKENS', 8192),
+    ],
+
 ];

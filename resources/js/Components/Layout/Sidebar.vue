@@ -19,6 +19,7 @@ const navSections = [
         label: 'Biblioteca',
         items: [
             { label: 'Personajes', href: '/library/characters', icon: 'users' },
+            { label: 'Talent Virtual', href: '/library/virtual-talents', icon: 'star' },
             { label: 'Locaciones', href: '/library/locations', icon: 'map-pin' },
             { label: 'Estilos', href: '/library/styles', icon: 'palette' },
             { label: 'Props', href: '/library/props', icon: 'package' },
