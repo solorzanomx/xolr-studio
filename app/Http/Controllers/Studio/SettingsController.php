@@ -74,7 +74,7 @@ class SettingsController extends Controller
         try {
             $health = Http::withToken($apiKey)
                 ->timeout(10)
-                ->get("https://api.runpod.io/v2/{$endpointId}/health");
+                ->get("https://api.runpod.ai/v2/{$endpointId}/health");
 
             if ($health->successful()) {
                 $workers = $health->json()['workers'] ?? [];

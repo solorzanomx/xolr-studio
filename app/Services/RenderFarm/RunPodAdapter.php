@@ -13,7 +13,7 @@ use RuntimeException;
 
 class RunPodAdapter implements RenderFarmContract
 {
-    private const BASE_URL = 'https://api.runpod.io/v2';
+    private const BASE_URL = 'https://api.runpod.ai/v2';
 
     private const TIER_PARAMS = [
         // draft usa Dev con pasos reducidos — Schnell requiere endpoint custom
