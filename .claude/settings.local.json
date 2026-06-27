@@ -4,7 +4,24 @@
       "Bash(npm uninstall *)",
       "Bash(npm install *)",
       "Bash(php artisan *)",
-      "Bash(npm run *)"
+      "Bash(npm run *)",
+      "Bash(git init *)",
+      "Bash(git remote *)",
+      "Bash(git -C /Users/alejandrosolorzanom/Desktop/xolr-studio remote -v)",
+      "Bash(git -C /Users/alejandrosolorzanom/Desktop/xolr-studio status)",
+      "Bash(git *)",
+      "Bash(composer require *)",
+      "Skill(run)",
+      "Bash(echo \"PID: $!\")",
+      "Bash(curl -s http://localhost:8000/login)",
+      "Bash(curl *)",
+      "Bash(pkill -f \"php artisan serve\")",
+      "Bash(pkill -f \"vite\")",
+      "Bash(php /Users/alejandrosolorzanom/Desktop/xolr-studio/artisan route:list --path=library)",
+      "Bash(php *)",
+      "Bash(grep *)",
+      "Bash(xargs ls -la)",
+      "Bash(xargs cat)"
     ]
   }
 }

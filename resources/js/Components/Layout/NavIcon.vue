@@ -2,7 +2,7 @@
 import {
     LayoutGrid, Users, MapPin, Palette, Folder, Camera, Image,
     Mic, Video, Sparkles, BarChart, Calendar, TrendingUp, Settings, Grid3x3,
-    Package, Star, Film, Tv, Megaphone
+    Package, Star, Film, Tv, Megaphone, Lightbulb
 } from '@lucide/vue'
 
 const props = defineProps({ name: String, class: String })
@@ -27,6 +27,7 @@ const icons = {
     film: Film,
     tv: Tv,
     megaphone: Megaphone,
+    lightbulb: Lightbulb,
 }
 </script>
 

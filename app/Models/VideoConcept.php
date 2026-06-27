@@ -30,8 +30,18 @@ class VideoConcept extends Model
         return $this->belongsTo(Project::class);
     }
 
+    public function series(): BelongsTo
+    {
+        return $this->belongsTo(VideoSeries::class, 'video_series_id');
+    }
+
     public function shots(): HasMany
     {
         return $this->hasMany(Shot::class);
+    }
+
+    public function thumbnailShots(): HasMany
+    {
+        return $this->hasMany(Shot::class)->where('purpose', 'thumbnail');
     }
 }

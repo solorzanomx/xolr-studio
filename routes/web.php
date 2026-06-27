@@ -17,6 +17,9 @@ use App\Http\Controllers\Production\SceneController;
 use App\Http\Controllers\Production\ShotController;
 use App\Http\Controllers\Production\PropertyController;
 use App\Http\Controllers\Production\CampaignController;
+use App\Http\Controllers\ContentMachine\VideoConceptController;
+use App\Http\Controllers\ContentMachine\VideoSeriesController;
+use App\Http\Controllers\ContentMachine\VideoHookController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth', 'verified'])->group(function (): void {
@@ -77,6 +80,28 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
     // Campaigns
     Route::resource('campaigns', CampaignController::class);
     Route::post('campaigns/{campaign}/generate-shots', [CampaignController::class, 'generateShots'])->name('campaigns.generate-shots');
+
+    // Content Machine — Ideas Bank, Video Concepts, Series, Hooks
+    Route::prefix('content-machine')->name('content-machine.')->group(function (): void {
+        Route::get('/', [VideoConceptController::class, 'index'])->name('index');
+        Route::get('/concepts/create', [VideoConceptController::class, 'create'])->name('concepts.create');
+        Route::post('/concepts', [VideoConceptController::class, 'store'])->name('concepts.store');
+        Route::get('/concepts/{concept}', [VideoConceptController::class, 'show'])->name('concepts.show');
+        Route::get('/concepts/{concept}/edit', [VideoConceptController::class, 'edit'])->name('concepts.edit');
+        Route::put('/concepts/{concept}', [VideoConceptController::class, 'update'])->name('concepts.update');
+        Route::delete('/concepts/{concept}', [VideoConceptController::class, 'destroy'])->name('concepts.destroy');
+        Route::post('/concepts/{concept}/generate', [VideoConceptController::class, 'generate'])->name('concepts.generate');
+        Route::post('/concepts/{concept}/thumbnail-shots', [VideoConceptController::class, 'addThumbnailShot'])->name('concepts.thumbnail-shots.store');
+
+        Route::post('/series', [VideoSeriesController::class, 'store'])->name('series.store');
+        Route::put('/series/{series}', [VideoSeriesController::class, 'update'])->name('series.update');
+        Route::delete('/series/{series}', [VideoSeriesController::class, 'destroy'])->name('series.destroy');
+
+        Route::get('/hooks', [VideoHookController::class, 'index'])->name('hooks.index');
+        Route::post('/hooks', [VideoHookController::class, 'store'])->name('hooks.store');
+        Route::put('/hooks/{hook}', [VideoHookController::class, 'update'])->name('hooks.update');
+        Route::delete('/hooks/{hook}', [VideoHookController::class, 'destroy'])->name('hooks.destroy');
+    });
 });
 
 require __DIR__.'/auth.php';
