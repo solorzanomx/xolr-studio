@@ -21,7 +21,8 @@
       "Bash(php *)",
       "Bash(grep *)",
       "Bash(xargs ls -la)",
-      "Bash(xargs cat)"
+      "Bash(xargs cat)",
+      "Bash(node -e \"const l = require\\('/Users/alejandrosolorzanom/Desktop/xolr-studio/node_modules/@lucide/vue/dist/cjs/lucide-vue.cjs'\\); const icons = ['ArrowLeft','Pencil','Tag','Clock','ChevronDown','ChevronUp','Check','Copy','Loader2','Lightbulb','List','ChevronRight']; icons.forEach\\(i => console.log\\(i + ':', !!l[i]\\)\\)\")"
     ]
   }
 }

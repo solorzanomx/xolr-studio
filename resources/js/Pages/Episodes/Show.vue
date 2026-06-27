@@ -1,8 +1,8 @@
 <script setup>
-import { Head, Link, router, useForm } from '@inertiajs/vue3'
-import { ref, onBeforeUnmount } from 'vue'
+import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3'
+import { ref, computed, onBeforeUnmount } from 'vue'
 import AppLayout from '@/Layouts/AppLayout.vue'
-import { ChevronLeft, Pencil, FileText, Camera, Plus, Trash2, Image, Video, Mic } from '@lucide/vue'
+import { ChevronLeft, Pencil, FileText, Camera, Plus, Trash2, Image, Video, Mic, Sparkles, BookOpen, CheckCheck, Wand2, X, AlertTriangle } from '@lucide/vue'
 import { useEditor, EditorContent } from '@tiptap/vue-3'
 import StarterKit from '@tiptap/starter-kit'
 const props = defineProps({
@@ -11,6 +11,34 @@ const props = defineProps({
 })
 
 const activeTab = ref('info')
+
+// ── Flash / AI results ─────────────────────────────────────────
+const page          = usePage()
+const flash         = computed(() => page.props.flash ?? {})
+const aiGenerating  = ref(null) // 'script' | 'chapter' | 'continuity'
+const showChapter   = ref(false)
+const showContinuity = ref(false)
+
+function generateScript() {
+    aiGenerating.value = 'script'
+    router.post(`/episodes/${props.episode.id}/generate-script`, {}, {
+        onFinish: () => { aiGenerating.value = null },
+    })
+}
+
+function generateBookChapter() {
+    aiGenerating.value = 'chapter'
+    router.post(`/episodes/${props.episode.id}/generate-book-chapter`, {}, {
+        onFinish: () => { aiGenerating.value = null; showChapter.value = true },
+    })
+}
+
+function checkContinuity() {
+    aiGenerating.value = 'continuity'
+    router.post(`/episodes/${props.episode.id}/continuity-check`, {}, {
+        onFinish: () => { aiGenerating.value = null; showContinuity.value = true },
+    })
+}
 
 // ── Script editor ──────────────────────────────────────────────
 const saveStatus = ref('saved') // 'saved' | 'saving' | 'unsaved' | 'error'
@@ -253,15 +281,112 @@ const epStatusLabel = {
                 :editor="editor"
                 class="bg-surface-1 border border-border border-t-0 rounded-b-xl p-6 min-h-96 prose prose-invert prose-sm max-w-none focus:outline-none [&_.ProseMirror]:outline-none [&_.ProseMirror]:min-h-80"
             />
+
+            <!-- AI Script Tools -->
+            <div class="mt-4 bg-surface-1 border border-violet/20 rounded-xl p-4">
+                <p class="text-[10px] font-mono text-violet uppercase tracking-widest mb-3 flex items-center gap-1.5">
+                    <Sparkles class="w-3 h-3" /> Herramientas IA
+                </p>
+                <div class="flex flex-wrap gap-2">
+                    <button
+                        @click="generateScript"
+                        :disabled="aiGenerating !== null"
+                        class="flex items-center gap-1.5 px-3 py-2 bg-violet/10 text-violet text-xs font-medium rounded-lg hover:bg-violet/20 disabled:opacity-50 transition-colors"
+                    >
+                        <Wand2 v-if="aiGenerating !== 'script'" class="w-3.5 h-3.5" />
+                        <Sparkles v-else class="w-3.5 h-3.5 animate-spin" />
+                        {{ aiGenerating === 'script' ? 'Generando...' : 'Generar script con IA' }}
+                    </button>
+                    <button
+                        @click="generateBookChapter"
+                        :disabled="aiGenerating !== null || !episode.script"
+                        class="flex items-center gap-1.5 px-3 py-2 bg-surface-2 text-text-secondary text-xs rounded-lg hover:text-text-primary hover:bg-surface-3 disabled:opacity-40 transition-colors"
+                    >
+                        <BookOpen v-if="aiGenerating !== 'chapter'" class="w-3.5 h-3.5" />
+                        <Sparkles v-else class="w-3.5 h-3.5 animate-spin" />
+                        {{ aiGenerating === 'chapter' ? 'Generando...' : 'Capítulo del libro' }}
+                    </button>
+                    <button
+                        @click="checkContinuity"
+                        :disabled="aiGenerating !== null || !episode.script"
+                        class="flex items-center gap-1.5 px-3 py-2 bg-surface-2 text-text-secondary text-xs rounded-lg hover:text-text-primary hover:bg-surface-3 disabled:opacity-40 transition-colors"
+                    >
+                        <CheckCheck v-if="aiGenerating !== 'continuity'" class="w-3.5 h-3.5" />
+                        <Sparkles v-else class="w-3.5 h-3.5 animate-spin" />
+                        {{ aiGenerating === 'continuity' ? 'Analizando...' : 'Verificar continuidad' }}
+                    </button>
+                </div>
+            </div>
+
+            <!-- Book chapter result -->
+            <div v-if="showChapter && flash.book_chapter" class="mt-4 bg-surface-1 border border-border rounded-xl">
+                <div class="flex items-center justify-between p-4 border-b border-border">
+                    <div class="flex items-center gap-2">
+                        <BookOpen class="w-4 h-4 text-amber" />
+                        <p class="text-sm font-medium text-text-primary">Capítulo del libro generado</p>
+                    </div>
+                    <button @click="showChapter = false" class="text-text-muted hover:text-text-primary transition-colors">
+                        <X class="w-4 h-4" />
+                    </button>
+                </div>
+                <div class="p-4 max-h-80 overflow-y-auto">
+                    <pre class="text-xs text-text-secondary whitespace-pre-wrap font-sans leading-relaxed">{{ flash.book_chapter }}</pre>
+                </div>
+            </div>
+
+            <!-- Continuity check result -->
+            <div v-if="showContinuity && flash.continuity_result" class="mt-4 bg-surface-1 border border-border rounded-xl">
+                <div class="flex items-center justify-between p-4 border-b border-border">
+                    <div class="flex items-center gap-2">
+                        <CheckCheck class="w-4 h-4 text-violet" />
+                        <p class="text-sm font-medium text-text-primary">Verificación de continuidad</p>
+                    </div>
+                    <button @click="showContinuity = false" class="text-text-muted hover:text-text-primary transition-colors">
+                        <X class="w-4 h-4" />
+                    </button>
+                </div>
+                <div class="p-4 space-y-3">
+                    <div v-if="!flash.continuity_result.has_issues" class="flex items-center gap-2 text-sm text-evergreen">
+                        <CheckCheck class="w-4 h-4" />
+                        Sin problemas de continuidad detectados.
+                    </div>
+                    <div v-else>
+                        <div
+                            v-for="issue in flash.continuity_result.issues"
+                            :key="issue.description"
+                            class="flex gap-2 text-xs p-3 bg-danger/5 border border-danger/20 rounded-lg mb-2"
+                        >
+                            <AlertTriangle class="w-3.5 h-3.5 text-danger shrink-0 mt-0.5" />
+                            <div>
+                                <p class="text-text-primary font-medium capitalize">{{ issue.type }}</p>
+                                <p class="text-text-muted mt-0.5">{{ issue.description }}</p>
+                                <p class="text-violet mt-1">→ {{ issue.suggestion }}</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div v-if="flash.continuity_result.suggestions?.length" class="space-y-1">
+                        <p class="text-[10px] text-text-muted uppercase tracking-wider">Sugerencias</p>
+                        <p v-for="s in flash.continuity_result.suggestions" :key="s" class="text-xs text-text-secondary">• {{ s }}</p>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <!-- STORYBOARD TAB -->
         <div v-if="activeTab === 'storyboard'">
             <div class="flex items-center justify-between mb-4">
                 <p class="text-xs text-text-muted">{{ episode.scenes?.length ?? 0 }} escenas · {{ episode.scenes?.reduce((a, s) => a + (s.shots?.length ?? 0), 0) ?? 0 }} shots</p>
-                <button @click="showSceneForm = !showSceneForm" class="inline-flex items-center gap-2 px-3 py-1.5 bg-amber text-surface-0 text-xs font-semibold rounded-lg hover:bg-amber/90 transition-colors">
-                    <Plus class="w-3.5 h-3.5" /> Añadir escena
-                </button>
+                <div class="flex gap-2">
+                    <button
+                        @click="router.post(`/episodes/${episode.id}/ai-director`)"
+                        class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-violet/10 text-violet text-xs font-medium rounded-lg hover:bg-violet/20 transition-colors"
+                    >
+                        <Sparkles class="w-3.5 h-3.5" /> AI Director
+                    </button>
+                    <button @click="showSceneForm = !showSceneForm" class="inline-flex items-center gap-2 px-3 py-1.5 bg-amber text-surface-0 text-xs font-semibold rounded-lg hover:bg-amber/90 transition-colors">
+                        <Plus class="w-3.5 h-3.5" /> Añadir escena
+                    </button>
+                </div>
             </div>
 
             <!-- Scene form -->

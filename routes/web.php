@@ -24,6 +24,8 @@ use App\Http\Controllers\ContentMachine\VideoHookController;
 use App\Http\Controllers\Audio\AudioAssetController;
 use App\Http\Controllers\Audio\VoiceProfileController;
 use App\Http\Controllers\Production\TalkingRenderController;
+use App\Http\Controllers\Production\AIDirectorController;
+use App\Http\Controllers\Production\ScriptGeneratorController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth', 'verified'])->group(function (): void {
@@ -123,6 +125,18 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
         Route::put('/hooks/{hook}', [VideoHookController::class, 'update'])->name('hooks.update');
         Route::delete('/hooks/{hook}', [VideoHookController::class, 'destroy'])->name('hooks.destroy');
     });
+
+    // AI Director
+    Route::get('/ai-director', [AIDirectorController::class, 'index'])->name('ai-director.index');
+    Route::post('/episodes/{episode}/ai-director', [AIDirectorController::class, 'run'])->name('episodes.ai-director.run');
+    Route::get('/ai-director/{aiDirectorResult}', [AIDirectorController::class, 'show'])->name('ai-director.show');
+    Route::post('/ai-director/{aiDirectorResult}/apply', [AIDirectorController::class, 'apply'])->name('ai-director.apply');
+    Route::delete('/ai-director/{aiDirectorResult}', [AIDirectorController::class, 'destroy'])->name('ai-director.destroy');
+
+    // Script Generator
+    Route::post('/episodes/{episode}/generate-script', [ScriptGeneratorController::class, 'generateScript'])->name('episodes.generate-script');
+    Route::post('/episodes/{episode}/generate-book-chapter', [ScriptGeneratorController::class, 'generateBookChapter'])->name('episodes.generate-book-chapter');
+    Route::post('/episodes/{episode}/continuity-check', [ScriptGeneratorController::class, 'checkContinuity'])->name('episodes.continuity-check');
 
     // Audio Studio
     Route::prefix('audio')->name('audio.')->group(function (): void {

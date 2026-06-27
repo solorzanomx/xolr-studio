@@ -32,4 +32,9 @@ class Episode extends Model
     {
         return $this->hasMany(Scene::class);
     }
+
+    public function aiDirectorResults(): HasMany
+    {
+        return $this->hasMany(AIDirectorResult::class);
+    }
 }
