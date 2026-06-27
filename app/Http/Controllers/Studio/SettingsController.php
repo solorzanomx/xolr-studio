@@ -23,34 +23,44 @@ class SettingsController extends Controller
             'endpoint' => ['ok' => false, 'label' => 'Endpoint', 'message' => ''],
         ];
 
-        // ── Paso 1: verificar API Key vía GraphQL ────────────────────────
+        // ── Paso 1: verificar API Key vía GraphQL (JSON) ─────────────────
         if (! $apiKey) {
-            $steps['api_key']['message'] = 'RUNPOD_API_KEY no está en .env';
+            $steps['api_key']['message']  = 'RUNPOD_API_KEY no está en .env';
             $steps['endpoint']['message'] = 'Pendiente de API key';
             return response()->json(['ok' => false, 'steps' => $steps]);
         }
 
         try {
             $gql = Http::timeout(10)
+                ->withHeaders(['Content-Type' => 'application/json'])
                 ->post("https://api.runpod.io/graphql?api_key={$apiKey}", [
-                    'query' => '{ myself { id email } }',
+                    'query' => '{ myself { id } }',
                 ]);
 
-            if ($gql->successful() && ! isset($gql->json()['errors'])) {
-                $email = $gql->json()['data']['myself']['email'] ?? 'cuenta verificada';
+            $body   = $gql->json();
+            $errors = $body['errors'] ?? null;
+            $id     = $body['data']['myself']['id'] ?? null;
+
+            if ($id) {
                 $steps['api_key']['ok']      = true;
-                $steps['api_key']['message'] = "Válida — {$email}";
-            } elseif ($gql->status() === 401 || isset($gql->json()['errors'])) {
-                $steps['api_key']['message'] = 'API Key inválida — revisa que no tenga espacios ni esté expirada';
+                $steps['api_key']['message'] = "Válida — cuenta ID: {$id}";
+            } elseif ($gql->status() === 401) {
+                $steps['api_key']['message']  = 'API Key inválida (401) — verifica que la copiaste completa';
                 $steps['endpoint']['message'] = 'Pendiente de API key válida';
                 return response()->json(['ok' => false, 'steps' => $steps]);
-            } else {
-                $steps['api_key']['message'] = "RunPod respondió {$gql->status()} al verificar key";
+            } elseif ($errors) {
+                $errMsg = $errors[0]['message'] ?? 'error desconocido';
+                $steps['api_key']['message']  = "GraphQL error: {$errMsg}";
                 $steps['endpoint']['message'] = 'No verificado';
                 return response()->json(['ok' => false, 'steps' => $steps]);
+            } else {
+                // Si no hay error explícito pero tampoco datos, asumimos key ok
+                // y dejamos que el health del endpoint confirme
+                $steps['api_key']['ok']      = true;
+                $steps['api_key']['message'] = 'Aceptada (verificación vía endpoint)';
             }
         } catch (\Throwable $e) {
-            $steps['api_key']['message'] = 'Sin conexión a RunPod: ' . $e->getMessage();
+            $steps['api_key']['message']  = 'Sin conexión a RunPod: ' . $e->getMessage();
             $steps['endpoint']['message'] = 'No verificado';
             return response()->json(['ok' => false, 'steps' => $steps]);
         }
