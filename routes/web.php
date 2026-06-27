@@ -17,6 +17,7 @@ use App\Http\Controllers\Production\SceneController;
 use App\Http\Controllers\Production\ShotController;
 use App\Http\Controllers\Production\PropertyController;
 use App\Http\Controllers\Production\CampaignController;
+use App\Http\Controllers\Production\RenderController;
 use App\Http\Controllers\ContentMachine\VideoConceptController;
 use App\Http\Controllers\ContentMachine\VideoSeriesController;
 use App\Http\Controllers\ContentMachine\VideoHookController;
@@ -75,6 +76,11 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
     Route::post('shots/{shot}/save-prompt', [ShotController::class, 'savePrompt'])->name('shots.save-prompt');
     Route::post('shots/{shot}/characters', [ShotController::class, 'addCharacter'])->name('shots.characters.store');
     Route::delete('shots/{shot}/characters/{character}', [ShotController::class, 'removeCharacter'])->name('shots.characters.destroy');
+
+    // Renders
+    Route::post('shots/{shot}/renders', [RenderController::class, 'store'])->name('shots.renders.store');
+    Route::post('renders/{render}/approve', [RenderController::class, 'approve'])->name('renders.approve');
+    Route::delete('renders/{render}', [RenderController::class, 'destroy'])->name('renders.destroy');
 
     // Properties (nested bajo proyecto)
     Route::post('projects/{project}/properties', [PropertyController::class, 'store'])->name('projects.properties.store');

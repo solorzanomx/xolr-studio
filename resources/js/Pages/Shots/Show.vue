@@ -55,6 +55,12 @@ const TIERS = [
 
 const selectedTier = ref('draft')
 
+const renderForm = useForm({ quality_tier: 'draft' })
+const submitRender = () => {
+    renderForm.quality_tier = selectedTier.value
+    renderForm.post(`/shots/${props.shot.id}/renders`, { preserveScroll: true })
+}
+
 // ────────────────────────────────────────────
 // Section collapse state
 // ────────────────────────────────────────────
@@ -370,7 +376,8 @@ const STATUS_COLORS = {
                             <span class="text-text-primary font-mono ml-1">${{ TIERS.find(t => t.key === selectedTier)?.cost }}</span>
                         </p>
                         <button
-                            :disabled="!activePrompt"
+                            @click="submitRender"
+                            :disabled="!activePrompt || renderForm.processing"
                             :class="[
                                 'flex items-center gap-2 text-xs px-4 py-2 rounded-md font-medium transition-all',
                                 activePrompt
@@ -379,7 +386,7 @@ const STATUS_COLORS = {
                             ]"
                         >
                             <Zap class="w-3 h-3" />
-                            Enviar a render
+                            {{ renderForm.processing ? 'Encolando…' : 'Enviar a render' }}
                         </button>
                     </div>
                 </div>

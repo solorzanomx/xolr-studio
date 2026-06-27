@@ -41,4 +41,15 @@ return [
         'max_tokens' => (int) env('ANTHROPIC_MAX_TOKENS', 8192),
     ],
 
+    'runpod' => [
+        'api_key'        => env('RUNPOD_API_KEY'),
+        'webhook_secret' => env('RUNPOD_WEBHOOK_SECRET'),
+        'mock_mode'      => (bool) env('RUNPOD_MOCK_MODE', false),
+        'endpoints'      => [
+            'image'   => env('RUNPOD_ENDPOINT_IMAGE'),
+            'video'   => env('RUNPOD_ENDPOINT_VIDEO'),
+            'upscale' => env('RUNPOD_ENDPOINT_UPSCALE'),
+        ],
+    ],
+
 ];
