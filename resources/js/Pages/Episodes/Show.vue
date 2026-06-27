@@ -74,10 +74,17 @@ function deleteScene(id) {
 }
 
 // ── Shots ──────────────────────────────────────────────────────
-const activeShotForm = ref(null) // scene id with open form
+const activeShotForm = ref(null) // scene id con form de creación abierto
+const editingShot    = ref(null) // shot id siendo editado
+
 const shotForm = useForm({
     description: '', shot_type: 'image', purpose: 'narrative',
     dialogue_text: '', director_notes: '', duration_seconds: '',
+})
+
+const editShotForm = useForm({
+    description: '', shot_type: 'image', purpose: 'narrative',
+    dialogue_text: '', director_notes: '', duration_seconds: '', status: 'draft',
 })
 
 function storeShot(sceneId) {
@@ -86,9 +93,27 @@ function storeShot(sceneId) {
     })
 }
 
+function openEditShot(shot) {
+    editingShot.value = shot.id
+    editShotForm.description     = shot.description ?? ''
+    editShotForm.shot_type       = shot.shot_type
+    editShotForm.purpose         = shot.purpose
+    editShotForm.dialogue_text   = shot.dialogue_text ?? ''
+    editShotForm.director_notes  = shot.director_notes ?? ''
+    editShotForm.duration_seconds = shot.duration_seconds ?? ''
+    editShotForm.status          = shot.status
+}
+
+function updateShot() {
+    editShotForm.put(`/shots/${editingShot.value}`, {
+        preserveScroll: true,
+        onSuccess: () => { editingShot.value = null; editShotForm.reset() },
+    })
+}
+
 function deleteShot(id) {
     if (!confirm('¿Eliminar shot?')) return
-    router.delete(`/shots/${id}`)
+    router.delete(`/shots/${id}`, { preserveScroll: true })
 }
 
 // ── Labels & colors ────────────────────────────────────────────
@@ -334,25 +359,87 @@ const epStatusLabel = {
                             <div
                                 v-for="shot in scene.shots"
                                 :key="shot.id"
-                                class="shrink-0 w-36 bg-surface-2 border border-border rounded-lg p-2.5 relative group"
+                                :class="['shrink-0 w-36 bg-surface-2 border rounded-lg p-2.5 relative group transition-colors', editingShot === shot.id ? 'border-amber' : 'border-border']"
                             >
                                 <div class="flex items-center justify-between mb-1.5">
-                                    <span class="text-[10px] font-mono text-amber">S{{ String(shot.number).padStart(2, '00') }}</span>
+                                    <span class="text-[10px] font-mono text-amber">S{{ String(shot.number).padStart(2, '0') }}</span>
                                     <div class="flex items-center gap-1">
                                         <component :is="shotTypeIcon[shot.shot_type]" class="w-3 h-3 text-text-muted" />
-                                        <span :class="['w-1.5 h-1.5 rounded-full', shotStatusColor[shot.status] ? 'bg-current' : 'bg-surface-3']" />
+                                        <span :class="['w-1.5 h-1.5 rounded-full bg-current', shotStatusColor[shot.status]]" />
                                     </div>
                                 </div>
                                 <p class="text-[11px] text-text-secondary line-clamp-3 leading-tight">
                                     {{ shot.description || shot.dialogue_text || shot.purpose }}
                                 </p>
                                 <span v-if="shot.duration_seconds" class="text-[9px] font-mono text-text-muted mt-1 block">{{ shot.duration_seconds }}s</span>
-                                <button
-                                    @click="deleteShot(shot.id)"
-                                    class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity text-text-muted hover:text-danger"
-                                >
-                                    <Trash2 class="w-3 h-3" />
-                                </button>
+                                <!-- Botones hover -->
+                                <div class="absolute top-1 right-1 flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <button @click="openEditShot(shot)" class="p-0.5 text-text-muted hover:text-amber transition-colors">
+                                        <Pencil class="w-3 h-3" />
+                                    </button>
+                                    <button @click="deleteShot(shot.id)" class="p-0.5 text-text-muted hover:text-danger transition-colors">
+                                        <Trash2 class="w-3 h-3" />
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Panel de edición inline -->
+                        <div v-if="editingShot && scene.shots?.some(s => s.id === editingShot)" class="mt-3 bg-surface-0 border border-amber/40 rounded-lg p-3 space-y-2">
+                            <p class="text-xs font-medium text-amber mb-2">Editando shot</p>
+                            <div class="grid grid-cols-3 gap-2">
+                                <div>
+                                    <label class="block text-xs text-text-muted mb-1">Tipo</label>
+                                    <select v-model="editShotForm.shot_type" class="w-full bg-surface-2 border border-border rounded px-2 py-1.5 text-xs text-text-primary focus:outline-none focus:border-amber transition-colors">
+                                        <option value="image">Imagen</option>
+                                        <option value="video">Video</option>
+                                        <option value="talking">Talking</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-xs text-text-muted mb-1">Propósito</label>
+                                    <select v-model="editShotForm.purpose" class="w-full bg-surface-2 border border-border rounded px-2 py-1.5 text-xs text-text-primary focus:outline-none focus:border-amber transition-colors">
+                                        <option value="narrative">Narrativo</option>
+                                        <option value="hero">Hero</option>
+                                        <option value="thumbnail">Thumbnail</option>
+                                        <option value="social">Social</option>
+                                        <option value="talking_dialogue">Diálogo</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-xs text-text-muted mb-1">Estado</label>
+                                    <select v-model="editShotForm.status" class="w-full bg-surface-2 border border-border rounded px-2 py-1.5 text-xs text-text-primary focus:outline-none focus:border-amber transition-colors">
+                                        <option value="draft">Borrador</option>
+                                        <option value="prompt_ready">Prompt listo</option>
+                                        <option value="rendering">Renderizando</option>
+                                        <option value="audio_pending">Audio pendiente</option>
+                                        <option value="lip_sync_pending">Lip sync pendiente</option>
+                                        <option value="completed">Completado</option>
+                                        <option value="approved">Aprobado</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-xs text-text-muted mb-1">Descripción</label>
+                                <input v-model="editShotForm.description" type="text" placeholder="Qué ocurre en este shot..." class="w-full bg-surface-2 border border-border rounded px-2 py-1.5 text-xs text-text-primary placeholder-text-muted focus:outline-none focus:border-amber transition-colors" />
+                            </div>
+                            <div class="grid grid-cols-2 gap-2">
+                                <div>
+                                    <label class="block text-xs text-text-muted mb-1">Notas de dirección</label>
+                                    <input v-model="editShotForm.director_notes" type="text" class="w-full bg-surface-2 border border-border rounded px-2 py-1.5 text-xs text-text-primary focus:outline-none focus:border-amber transition-colors" />
+                                </div>
+                                <div>
+                                    <label class="block text-xs text-text-muted mb-1">Duración (seg)</label>
+                                    <input v-model="editShotForm.duration_seconds" type="number" min="1" class="w-full bg-surface-2 border border-border rounded px-2 py-1.5 text-xs font-mono text-text-primary focus:outline-none focus:border-amber transition-colors" />
+                                </div>
+                            </div>
+                            <div v-if="editShotForm.shot_type === 'talking'">
+                                <label class="block text-xs text-text-muted mb-1">Diálogo</label>
+                                <textarea v-model="editShotForm.dialogue_text" rows="2" class="w-full bg-surface-2 border border-border rounded px-2 py-1.5 text-xs text-text-primary focus:outline-none focus:border-amber transition-colors resize-none" />
+                            </div>
+                            <div class="flex gap-2 pt-1">
+                                <button @click="updateShot" :disabled="editShotForm.processing" class="px-3 py-1 bg-amber text-surface-0 text-xs font-semibold rounded hover:bg-amber/90 disabled:opacity-50 transition-colors">Guardar</button>
+                                <button @click="editingShot = null; editShotForm.reset()" class="text-xs text-text-muted hover:text-text-primary transition-colors">Cancelar</button>
                             </div>
                         </div>
                     </div>
