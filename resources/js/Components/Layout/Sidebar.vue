@@ -38,7 +38,7 @@ const navSections = [
     {
         label: 'Audio & Video',
         items: [
-            { label: 'Audio Studio', href: '/audio', icon: 'mic', soon: true },
+            { label: 'Audio Studio', href: '/audio', icon: 'mic' },
             { label: 'Lip Sync', href: '/lipsync', icon: 'video', soon: true },
         ],
     },

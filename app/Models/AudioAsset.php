@@ -19,6 +19,8 @@ class AudioAsset extends Model
     {
         return [
             'generation_cost_usd' => 'decimal:6',
+            'duration_seconds'    => 'float',
+            'metadata'            => 'array',
         ];
     }
 

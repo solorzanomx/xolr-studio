@@ -21,6 +21,8 @@ use App\Http\Controllers\Production\RenderController;
 use App\Http\Controllers\ContentMachine\VideoConceptController;
 use App\Http\Controllers\ContentMachine\VideoSeriesController;
 use App\Http\Controllers\ContentMachine\VideoHookController;
+use App\Http\Controllers\Audio\AudioAssetController;
+use App\Http\Controllers\Audio\VoiceProfileController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth', 'verified'])->group(function (): void {
@@ -113,6 +115,18 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
         Route::post('/hooks', [VideoHookController::class, 'store'])->name('hooks.store');
         Route::put('/hooks/{hook}', [VideoHookController::class, 'update'])->name('hooks.update');
         Route::delete('/hooks/{hook}', [VideoHookController::class, 'destroy'])->name('hooks.destroy');
+    });
+
+    // Audio Studio
+    Route::prefix('audio')->name('audio.')->group(function (): void {
+        Route::get('/', [AudioAssetController::class, 'index'])->name('index');
+        Route::post('/assets', [AudioAssetController::class, 'store'])->name('assets.store');
+        Route::delete('/assets/{audioAsset}', [AudioAssetController::class, 'destroy'])->name('assets.destroy');
+        Route::post('/assets/{audioAsset}/subtitles', [AudioAssetController::class, 'generateSubtitles'])->name('assets.subtitles');
+
+        Route::post('/characters/{character}/voice-profiles', [VoiceProfileController::class, 'store'])->name('voice-profiles.store');
+        Route::put('/voice-profiles/{voiceProfile}', [VoiceProfileController::class, 'update'])->name('voice-profiles.update');
+        Route::delete('/voice-profiles/{voiceProfile}', [VoiceProfileController::class, 'destroy'])->name('voice-profiles.destroy');
     });
 });
 

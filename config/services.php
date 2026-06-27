@@ -41,6 +41,22 @@ return [
         'max_tokens' => (int) env('ANTHROPIC_MAX_TOKENS', 8192),
     ],
 
+    'elevenlabs' => [
+        'api_key'          => env('ELEVENLABS_API_KEY'),
+        'default_voice_id' => env('ELEVENLABS_DEFAULT_VOICE_ID', 'EXAVITQu4vr4xnSDxMaL'),
+        'mock_mode'        => (bool) env('ELEVENLABS_MOCK_MODE', false),
+    ],
+
+    'suno' => [
+        'api_key'   => env('SUNO_API_KEY'),
+        'mock_mode' => (bool) env('SUNO_MOCK_MODE', false),
+    ],
+
+    'openai' => [
+        'key'       => env('OPENAI_API_KEY'),
+        'mock_mode' => (bool) env('OPENAI_MOCK_MODE', false),
+    ],
+
     'runpod' => [
         'api_key'        => env('RUNPOD_API_KEY'),
         'webhook_secret' => env('RUNPOD_WEBHOOK_SECRET'),
