@@ -2,7 +2,7 @@
 import { Head, Link, router, useForm } from '@inertiajs/vue3'
 import { ref } from 'vue'
 import AppLayout from '@/Layouts/AppLayout.vue'
-import { ChevronLeft, Pencil, Trash2, Plus, Tv, ChevronRight } from '@lucide/vue'
+import { ChevronLeft, Pencil, Trash2, Plus, Tv, ChevronRight, BarChart2 } from '@lucide/vue'
 
 const props = defineProps({ project: Object })
 
@@ -52,6 +52,9 @@ const seasonStatusColor = { planned:'text-text-muted', writing:'text-info', prod
                 </div>
             </div>
             <div class="flex gap-2">
+                <Link :href="`/projects/${project.id}/intelligence`" class="inline-flex items-center gap-2 px-3 py-2 bg-surface-1 border border-border rounded-lg text-sm text-text-secondary hover:text-text-primary transition-colors">
+                    <BarChart2 class="w-4 h-4" /> Intelligence
+                </Link>
                 <Link :href="`/projects/${project.id}/edit`" class="inline-flex items-center gap-2 px-3 py-2 bg-surface-1 border border-border rounded-lg text-sm text-text-secondary hover:text-text-primary transition-colors">
                     <Pencil class="w-4 h-4" /> Editar
                 </Link>

@@ -46,7 +46,7 @@ const navSections = [
         label: 'Inteligencia',
         items: [
             { label: 'AI Director', href: '/ai-director', icon: 'sparkles' },
-            { label: 'Intelligence', href: '/intelligence', icon: 'bar-chart', soon: true },
+            { label: 'Intelligence', href: '/projects', icon: 'bar-chart' },
         ],
     },
     {

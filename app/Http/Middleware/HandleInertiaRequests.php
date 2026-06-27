@@ -38,8 +38,9 @@ class HandleInertiaRequests extends Middleware
                 'success'          => $request->session()->get('success'),
                 'error'            => $request->session()->get('error'),
                 'info'             => $request->session()->get('info'),
-                'book_chapter'     => $request->session()->get('book_chapter'),
+                'book_chapter'      => $request->session()->get('book_chapter'),
                 'continuity_result' => $request->session()->get('continuity_result'),
+                'continuity_check'  => $request->session()->get('continuity_check'),
             ],
         ];
     }

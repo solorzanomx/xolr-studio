@@ -26,6 +26,7 @@ use App\Http\Controllers\Audio\VoiceProfileController;
 use App\Http\Controllers\Production\TalkingRenderController;
 use App\Http\Controllers\Production\AIDirectorController;
 use App\Http\Controllers\Production\ScriptGeneratorController;
+use App\Http\Controllers\Intelligence\IntelligenceController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth', 'verified'])->group(function (): void {
@@ -125,6 +126,10 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
         Route::put('/hooks/{hook}', [VideoHookController::class, 'update'])->name('hooks.update');
         Route::delete('/hooks/{hook}', [VideoHookController::class, 'destroy'])->name('hooks.destroy');
     });
+
+    // Intelligence Engine
+    Route::get('/projects/{project}/intelligence', [IntelligenceController::class, 'show'])->name('projects.intelligence');
+    Route::post('/scenes/{scene}/continuity-check', [IntelligenceController::class, 'checkSceneContinuity'])->name('scenes.continuity-check');
 
     // AI Director
     Route::get('/ai-director', [AIDirectorController::class, 'index'])->name('ai-director.index');
