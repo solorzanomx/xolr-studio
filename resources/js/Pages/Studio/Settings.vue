@@ -5,7 +5,8 @@ import AppLayout from '@/Layouts/AppLayout.vue'
 import {
     User, Lock, Plug, CheckCircle, XCircle, ExternalLink,
     Save, Eye, EyeOff, Monitor, Smartphone, Globe, Trash2,
-    ShieldCheck, AlertTriangle, LogOut, Palette, Clock, Mail
+    ShieldCheck, AlertTriangle, LogOut, Palette, Clock, Mail,
+    Zap, Loader2, Wifi, WifiOff,
 } from '@lucide/vue'
 
 const props = defineProps({ integrations: Object })
@@ -111,6 +112,29 @@ const initials = computed(() => {
     const parts = (profileForm.name || user.value.name || '?').split(' ')
     return parts.map(p => p[0]).slice(0, 2).join('').toUpperCase()
 })
+
+// ── RunPod connection test ────────────────────────────────────────
+const runpodTest    = ref(null)   // null | { ok, message, raw }
+const testingRunpod = ref(false)
+
+async function testRunPod() {
+    testingRunpod.value = true
+    runpodTest.value    = null
+    try {
+        const res  = await fetch('/settings/runpod/ping', {
+            method:  'POST',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRF-TOKEN':     document.querySelector('meta[name="csrf-token"]')?.content ?? '',
+            },
+        })
+        runpodTest.value = await res.json()
+    } catch (e) {
+        runpodTest.value = { ok: false, message: 'Error de red: ' + e.message }
+    } finally {
+        testingRunpod.value = false
+    }
+}
 
 const TIMEZONES = [
     'America/Mexico_City', 'America/Monterrey', 'America/Cancun',
@@ -409,21 +433,50 @@ const TIMEZONES = [
             <!-- ════════════════ TAB: INTEGRACIONES ════════════════ -->
             <div v-else-if="tab === 'integrations'">
                 <div class="bg-surface-1 border border-border rounded-2xl divide-y divide-border overflow-hidden mb-3">
-                    <div v-for="(integration, key) in integrations" :key="key"
-                        class="flex items-center gap-4 px-5 py-4">
-                        <div class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
-                            :class="integration.configured ? 'bg-emerald-400/10' : 'bg-surface-2'">
-                            <CheckCircle v-if="integration.configured" class="w-4 h-4 text-emerald-400" />
-                            <XCircle v-else class="w-4 h-4 text-text-muted" />
+                    <div v-for="(integration, key) in integrations" :key="key">
+                        <div class="flex items-center gap-4 px-5 py-4">
+                            <div class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+                                :class="integration.configured ? 'bg-emerald-400/10' : 'bg-surface-2'">
+                                <CheckCircle v-if="integration.configured" class="w-4 h-4 text-emerald-400" />
+                                <XCircle v-else class="w-4 h-4 text-text-muted" />
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-sm font-medium text-text-primary">{{ integration.label }}</p>
+                                <p class="text-xs text-text-muted mt-0.5">{{ integration.description }}</p>
+                            </div>
+                            <div class="flex items-center gap-2 shrink-0">
+                                <!-- Test button only for RunPod -->
+                                <button v-if="key === 'runpod' && integration.configured"
+                                    @click="testRunPod"
+                                    :disabled="testingRunpod"
+                                    class="flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-semibold rounded-lg border border-amber/40 text-amber hover:bg-amber/10 disabled:opacity-50 transition-colors">
+                                    <Loader2 v-if="testingRunpod" class="w-3 h-3 animate-spin" />
+                                    <Zap v-else class="w-3 h-3" />
+                                    {{ testingRunpod ? 'Probando…' : 'Probar' }}
+                                </button>
+                                <span class="text-[10px] font-mono px-2 py-1 rounded-lg"
+                                    :class="integration.configured ? 'bg-emerald-400/10 text-emerald-400' : 'bg-surface-2 text-text-muted'">
+                                    {{ integration.configured ? 'configurado' : 'sin configurar' }}
+                                </span>
+                            </div>
                         </div>
-                        <div class="flex-1 min-w-0">
-                            <p class="text-sm font-medium text-text-primary">{{ integration.label }}</p>
-                            <p class="text-xs text-text-muted mt-0.5">{{ integration.description }}</p>
+                        <!-- RunPod test result -->
+                        <div v-if="key === 'runpod' && runpodTest" class="px-5 pb-4">
+                            <div class="flex items-start gap-2.5 rounded-xl px-3 py-2.5 text-xs"
+                                :class="runpodTest.ok ? 'bg-emerald-400/10 text-emerald-400' : 'bg-danger/10 text-danger'">
+                                <Wifi v-if="runpodTest.ok" class="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                                <WifiOff v-else class="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                                <div>
+                                    <p class="font-semibold">{{ runpodTest.ok ? 'Conexión exitosa' : 'Error de conexión' }}</p>
+                                    <p class="opacity-80 mt-0.5">{{ runpodTest.message }}</p>
+                                    <div v-if="runpodTest.raw && runpodTest.ok" class="mt-1.5 font-mono text-[10px] opacity-60 flex gap-3">
+                                        <span>ready: {{ runpodTest.raw.ready ?? 0 }}</span>
+                                        <span>idle: {{ runpodTest.raw.idle ?? 0 }}</span>
+                                        <span>running: {{ runpodTest.raw.running ?? 0 }}</span>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-                        <span class="text-[10px] font-mono px-2 py-1 rounded-lg shrink-0"
-                            :class="integration.configured ? 'bg-emerald-400/10 text-emerald-400' : 'bg-surface-2 text-text-muted'">
-                            {{ integration.configured ? 'conectado' : 'sin configurar' }}
-                        </span>
                     </div>
                 </div>
                 <p class="text-xs text-text-muted flex items-center gap-1.5 px-1">

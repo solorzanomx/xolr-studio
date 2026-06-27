@@ -45,6 +45,7 @@ Route::post('/preview/{token}/auth', [PreviewController::class, 'authenticate'])
 Route::middleware(['auth', 'verified'])->group(function (): void {
     Route::get('/', DashboardController::class)->name('dashboard');
     Route::get('/settings', SettingsController::class)->name('settings');
+    Route::post('/settings/runpod/ping', [SettingsController::class, 'pingRunPod'])->name('settings.runpod.ping');
 
     // Profile
     Route::put('/profile', [ProfileController::class, 'update'])->name('profile.update');
