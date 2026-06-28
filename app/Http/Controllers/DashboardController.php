@@ -54,7 +54,10 @@ class DashboardController extends Controller
             ->whereNotNull('file_path')
             ->latest()
             ->limit(8)
-            ->get(['id', 'shot_id', 'status', 'quality_tier', 'gpu_cost_usd', 'is_approved', 'file_path', 'created_at']);
+            ->get(['id', 'shot_id', 'status', 'quality_tier', 'gpu_cost_usd', 'is_approved', 'file_path', 'created_at'])
+            ->map(fn ($r) => array_merge($r->toArray(), [
+                'thumbnail_url' => asset('storage/' . $r->file_path),
+            ]));
 
         return Inertia::render('Dashboard', [
             'projects' => $projects,

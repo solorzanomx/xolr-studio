@@ -133,7 +133,7 @@ const tierColor = {
                         class="bg-surface-1 border border-border rounded-lg p-3 flex items-center gap-3"
                     >
                         <div class="w-8 h-8 rounded bg-surface-2 shrink-0 overflow-hidden">
-                            <img v-if="render.file_path" :src="render.file_path" class="w-full h-full object-cover" />
+                            <img v-if="render.thumbnail_url" :src="render.thumbnail_url" class="w-full h-full object-cover" />
                             <Image v-else class="w-4 h-4 text-text-muted m-2" />
                         </div>
                         <div class="flex-1 min-w-0">
