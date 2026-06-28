@@ -22,7 +22,7 @@ class RenderController extends Controller
         $projects = Project::orderBy('name')->get(['id', 'name']);
 
         $query = Render::with([
-            'shot:id,scene_id,label,shot_type',
+            'shot:id,scene_id,number,shot_type',
             'shot.scene:id,episode_id,title',
             'shot.scene.episode:id,season_id,title',
             'shot.scene.episode.season:id,project_id',
@@ -70,7 +70,7 @@ class RenderController extends Controller
                 'created_at'   => $r->created_at->toDateTimeString(),
                 'shot'         => [
                     'id'        => $r->shot?->id,
-                    'label'     => $r->shot?->label,
+                    'label'     => $r->shot ? "Shot #{$r->shot->number}" : null,
                     'shot_type' => $r->shot?->shot_type,
                     'characters'=> $r->shot?->characters->pluck('name'),
                     'project'   => $r->shot?->scene?->episode?->season?->project?->only(['id', 'name']),
