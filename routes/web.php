@@ -45,7 +45,11 @@ Route::post('/preview/{token}/auth', [PreviewController::class, 'authenticate'])
 Route::middleware(['auth', 'verified'])->group(function (): void {
     Route::get('/', DashboardController::class)->name('dashboard');
     Route::get('/settings', SettingsController::class)->name('settings');
-    Route::post('/settings/runpod/ping', [SettingsController::class, 'pingRunPod'])->name('settings.runpod.ping');
+    Route::post('/settings/runpod/ping',    [SettingsController::class, 'pingRunPod'])->name('settings.runpod.ping');
+    Route::post('/settings/comfyui/url',    [SettingsController::class, 'updateComfyUrl'])->name('settings.comfyui.url');
+    Route::post('/settings/comfyui/ping',   [SettingsController::class, 'pingComfyUI'])->name('settings.comfyui.ping');
+    Route::get('/settings/comfyui/worker',  [SettingsController::class, 'workerStatus'])->name('settings.comfyui.worker');
+    Route::post('/settings/comfyui/worker', [SettingsController::class, 'restartWorker'])->name('settings.comfyui.worker.restart');
 
     // Profile
     Route::put('/profile', [ProfileController::class, 'update'])->name('profile.update');

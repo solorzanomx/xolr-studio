@@ -67,10 +67,10 @@ return [
         'base_url'  => env('COMFYUI_BASE_URL', ''),
         'mock_mode' => (bool) env('COMFYUI_MOCK_MODE', false),
         'models'    => [
-            'dev'     => env('COMFYUI_MODEL_DEV',     'flux1-dev-fp8.safetensors'),
+            'dev'     => env('COMFYUI_MODEL_DEV',     'FLUX1/flux1-dev-fp8.safetensors'),
             'clip_l'  => env('COMFYUI_MODEL_CLIP_L',  'clip_l.safetensors'),
-            'clip_t5' => env('COMFYUI_MODEL_CLIP_T5', 't5xxl_fp8_e4m3fn.safetensors'),
-            'vae'     => env('COMFYUI_MODEL_VAE',      'ae.safetensors'),
+            'clip_t5' => env('COMFYUI_MODEL_CLIP_T5', 't5/t5xxl_fp16.safetensors'),
+            'vae'     => env('COMFYUI_MODEL_VAE',      'FLUX1/ae.safetensors'),
         ],
     ],
 

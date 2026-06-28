@@ -93,7 +93,7 @@ class ComfyUIAdapter implements RenderFarmContract
         $history      = $data[$render->job_id];
         $statusInfo   = $history['status'] ?? [];
         $completed    = $statusInfo['completed'] ?? false;
-        $statusString = $statusInfo['status_string'] ?? 'executing';
+        $statusString = $statusInfo['status_string'] ?? 'success';
 
         if (! $completed) {
             return new RenderStatusResult(
@@ -199,10 +199,10 @@ class ComfyUIAdapter implements RenderFarmContract
     private function model(string $key): string
     {
         return $this->models[$key] ?? match ($key) {
-            'dev'     => 'flux1-dev-fp8.safetensors',
+            'dev'     => 'FLUX1/flux1-dev-fp8.safetensors',
             'clip_l'  => 'clip_l.safetensors',
-            'clip_t5' => 't5xxl_fp8_e4m3fn.safetensors',
-            'vae'     => 'ae.safetensors',
+            'clip_t5' => 't5/t5xxl_fp16.safetensors',
+            'vae'     => 'FLUX1/ae.safetensors',
             default   => throw new RuntimeException("Modelo ComfyUI '{$key}' no definido"),
         };
     }

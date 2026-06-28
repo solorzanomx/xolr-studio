@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Studio;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Http;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -112,6 +113,96 @@ class SettingsController extends Controller
                 'youtube'    => ['label' => 'YouTube',            'description' => 'Subida automática de videos y analytics',         'configured' => ! empty(config('services.youtube.access_token'))],
                 'notion'     => ['label' => 'Notion',             'description' => 'Sincronización de episodios y producción',        'configured' => ! empty(config('services.notion.token'))],
             ],
+            'comfyui_url'    => config('services.comfyui.base_url', ''),
+            'worker_running' => $this->workerRunning(),
         ]);
+    }
+
+    // ── ComfyUI Pod ──────────────────────────────────────────────────
+
+    public function updateComfyUrl(Request $request): JsonResponse
+    {
+        $url = rtrim((string) $request->input('url', ''), '/');
+
+        if ($url && ! filter_var($url, FILTER_VALIDATE_URL)) {
+            return response()->json(['ok' => false, 'message' => 'URL inválida'], 422);
+        }
+
+        $this->writeEnvValue('COMFYUI_BASE_URL', $url);
+
+        Artisan::call('config:cache');
+        Artisan::call('queue:restart');
+
+        return response()->json(['ok' => true, 'url' => $url]);
+    }
+
+    public function pingComfyUI(): JsonResponse
+    {
+        $url = config('services.comfyui.base_url');
+
+        if (! $url) {
+            return response()->json(['ok' => false, 'message' => 'URL no configurada — guarda la URL del Pod primero']);
+        }
+
+        try {
+            $stats = Http::timeout(8)->get("{$url}/system_stats");
+
+            if (! $stats->successful()) {
+                return response()->json(['ok' => false, 'message' => "ComfyUI respondió {$stats->status()} — verifica que el Pod esté encendido"]);
+            }
+
+            $queue   = Http::timeout(5)->get("{$url}/queue")->json();
+            $running = count($queue['queue_running'] ?? []);
+            $pending = count($queue['queue_pending'] ?? []);
+
+            return response()->json([
+                'ok'      => true,
+                'message' => "Conectado — running:{$running} pending:{$pending}",
+            ]);
+
+        } catch (\Throwable $e) {
+            return response()->json(['ok' => false, 'message' => 'Sin conexión: ' . $e->getMessage()]);
+        }
+    }
+
+    public function workerStatus(): JsonResponse
+    {
+        return response()->json(['running' => $this->workerRunning()]);
+    }
+
+    public function restartWorker(): JsonResponse
+    {
+        Artisan::call('queue:restart');
+        sleep(2);
+
+        if (! $this->workerRunning()) {
+            $artisan = base_path('artisan');
+            exec("nohup php {$artisan} queue:work --queue=renders,default --sleep=3 --tries=3 >> /var/log/xolrstudio-queue.log 2>&1 & echo \$!", $out);
+            sleep(1);
+        }
+
+        return response()->json(['ok' => true, 'running' => $this->workerRunning()]);
+    }
+
+    // ── Helpers ──────────────────────────────────────────────────────
+
+    private function workerRunning(): bool
+    {
+        exec('ps aux | grep "queue:work" | grep "xolrstudio" | grep -v grep 2>/dev/null', $lines);
+        return ! empty(array_filter($lines));
+    }
+
+    private function writeEnvValue(string $key, string $value): void
+    {
+        $path    = base_path('.env');
+        $content = file_get_contents($path);
+
+        if (preg_match("/^{$key}=/m", $content)) {
+            $content = preg_replace("/^{$key}=.*/m", "{$key}={$value}", $content);
+        } else {
+            $content .= "\n{$key}={$value}\n";
+        }
+
+        file_put_contents($path, $content);
     }
 }

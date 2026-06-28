@@ -9,7 +9,11 @@ import {
     Zap, Loader2, Wifi, WifiOff,
 } from '@lucide/vue'
 
-const props = defineProps({ integrations: Object })
+const props = defineProps({
+    integrations:   Object,
+    comfyui_url:    { type: String, default: '' },
+    worker_running: { type: Boolean, default: false },
+})
 
 const page    = usePage()
 const user    = computed(() => page.props.auth?.user ?? {})
@@ -112,6 +116,63 @@ const initials = computed(() => {
     const parts = (profileForm.name || user.value.name || '?').split(' ')
     return parts.map(p => p[0]).slice(0, 2).join('').toUpperCase()
 })
+
+// ── ComfyUI Pod management ───────────────────────────────────────
+const comfyUrl       = ref(props.comfyui_url)
+const workerRunning  = ref(props.worker_running)
+const savingComfy    = ref(false)
+const comfySaved     = ref(false)
+const testingComfy   = ref(false)
+const comfyTest      = ref(null)
+const restartingWorker = ref(false)
+
+const csrf = () => document.querySelector('meta[name="csrf-token"]')?.content ?? ''
+
+async function saveComfyUrl() {
+    savingComfy.value = true
+    comfySaved.value  = false
+    try {
+        const res = await fetch('/settings/comfyui/url', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-TOKEN': csrf() },
+            body: JSON.stringify({ url: comfyUrl.value }),
+        })
+        const data = await res.json()
+        if (data.ok) comfySaved.value = true
+    } finally {
+        savingComfy.value = false
+    }
+}
+
+async function testComfyUI() {
+    testingComfy.value = true
+    comfyTest.value    = null
+    try {
+        const res = await fetch('/settings/comfyui/ping', {
+            method: 'POST',
+            headers: { 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-TOKEN': csrf() },
+        })
+        comfyTest.value = await res.json()
+    } catch (e) {
+        comfyTest.value = { ok: false, message: 'Error de red: ' + e.message }
+    } finally {
+        testingComfy.value = false
+    }
+}
+
+async function restartWorker() {
+    restartingWorker.value = true
+    try {
+        const res = await fetch('/settings/comfyui/worker', {
+            method: 'POST',
+            headers: { 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-TOKEN': csrf() },
+        })
+        const data = await res.json()
+        workerRunning.value = data.running ?? false
+    } finally {
+        restartingWorker.value = false
+    }
+}
 
 // ── RunPod connection test ────────────────────────────────────────
 const runpodTest    = ref(null)   // null | { ok, message, raw }
@@ -478,6 +539,72 @@ const TIMEZONES = [
                         </div>
                     </div>
                 </div>
+                <!-- ComfyUI Pod management card -->
+                <div class="bg-surface-1 border border-border rounded-2xl overflow-hidden mb-3">
+                    <!-- Header -->
+                    <div class="flex items-center gap-4 px-5 py-4 border-b border-border">
+                        <div class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+                            :class="comfyUrl ? 'bg-violet-400/10' : 'bg-surface-2'">
+                            <Zap class="w-4 h-4" :class="comfyUrl ? 'text-violet-400' : 'text-text-muted'" />
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <p class="text-sm font-medium text-text-primary">ComfyUI Pod</p>
+                            <p class="text-xs text-text-muted mt-0.5">Render GPU — FLUX, PuLID, workflows custom</p>
+                        </div>
+                        <button @click="testComfyUI" :disabled="testingComfy || !comfyUrl"
+                            class="flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-semibold rounded-lg border border-violet-400/40 text-violet-400 hover:bg-violet-400/10 disabled:opacity-40 transition-colors">
+                            <Loader2 v-if="testingComfy" class="w-3 h-3 animate-spin" />
+                            <Wifi v-else class="w-3 h-3" />
+                            {{ testingComfy ? 'Probando…' : 'Probar' }}
+                        </button>
+                    </div>
+
+                    <div class="px-5 py-4 space-y-4">
+                        <!-- URL field -->
+                        <div class="space-y-1.5">
+                            <label class="text-xs font-medium text-text-muted">URL del Pod (puerto 8188)</label>
+                            <div class="flex gap-2">
+                                <input v-model="comfyUrl"
+                                    placeholder="https://xxxxxxxx-8188.proxy.runpod.net"
+                                    class="flex-1 bg-surface-2 border border-border rounded-lg px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-violet-400/50 font-mono" />
+                                <button @click="saveComfyUrl" :disabled="savingComfy"
+                                    class="flex items-center gap-1.5 px-3 py-2 text-sm font-semibold rounded-lg bg-violet-500/20 text-violet-400 hover:bg-violet-500/30 disabled:opacity-50 transition-colors whitespace-nowrap">
+                                    <Loader2 v-if="savingComfy" class="w-3.5 h-3.5 animate-spin" />
+                                    <Save v-else-if="!comfySaved" class="w-3.5 h-3.5" />
+                                    <CheckCircle v-else class="w-3.5 h-3.5 text-emerald-400" />
+                                    {{ savingComfy ? 'Guardando…' : comfySaved ? 'Guardado' : 'Guardar' }}
+                                </button>
+                            </div>
+                            <p class="text-[11px] text-text-muted">Pega aquí la URL del Pod cuando lo enciendas. Se actualiza el servidor automáticamente.</p>
+                        </div>
+
+                        <!-- Worker status -->
+                        <div class="flex items-center justify-between pt-1 border-t border-border">
+                            <div class="flex items-center gap-2">
+                                <div class="w-2 h-2 rounded-full" :class="workerRunning ? 'bg-emerald-400 animate-pulse' : 'bg-red-400'"></div>
+                                <span class="text-xs text-text-muted">Queue worker</span>
+                                <span class="text-xs font-mono" :class="workerRunning ? 'text-emerald-400' : 'text-red-400'">
+                                    {{ workerRunning ? 'corriendo' : 'detenido' }}
+                                </span>
+                            </div>
+                            <button @click="restartWorker" :disabled="restartingWorker"
+                                class="flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-semibold rounded-lg border border-border text-text-muted hover:text-text-primary hover:border-text-muted disabled:opacity-50 transition-colors">
+                                <Loader2 v-if="restartingWorker" class="w-3 h-3 animate-spin" />
+                                <Zap v-else class="w-3 h-3" />
+                                {{ restartingWorker ? 'Reiniciando…' : 'Reiniciar worker' }}
+                            </button>
+                        </div>
+
+                        <!-- Test result -->
+                        <div v-if="comfyTest" class="flex items-start gap-2.5 rounded-xl px-3 py-2.5 text-xs"
+                            :class="comfyTest.ok ? 'bg-emerald-400/10 text-emerald-400' : 'bg-danger/10 text-danger'">
+                            <CheckCircle v-if="comfyTest.ok" class="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                            <XCircle v-else class="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                            <p class="font-mono">{{ comfyTest.message }}</p>
+                        </div>
+                    </div>
+                </div>
+
                 <p class="text-xs text-text-muted flex items-center gap-1.5 px-1">
                     <ExternalLink class="w-3 h-3" />
                     Configura las API keys en el archivo <code class="font-mono text-text-secondary bg-surface-2 px-1 py-0.5 rounded">.env</code> del servidor via nano.
