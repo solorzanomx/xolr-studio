@@ -18,9 +18,13 @@ class IntelligenceService
         $seasonIds  = $project->seasons->pluck('id');
         $episodeIds = DB::table('episodes')->whereIn('season_id', $seasonIds)->pluck('id');
         $sceneIds   = DB::table('scenes')->whereIn('episode_id', $episodeIds)->pluck('id');
-        $shotIds    = DB::table('shots')
-            ->whereIn('scene_id', $sceneIds)
-            ->orWhere('campaign_id', DB::table('campaigns')->where('project_id', $project->id)->pluck('id'))
+        $campaignIds = DB::table('campaigns')->where('project_id', $project->id)->pluck('id');
+
+        $shotIds = DB::table('shots')
+            ->where(function ($q) use ($sceneIds, $campaignIds): void {
+                $q->whereIn('scene_id', $sceneIds)
+                  ->orWhereIn('campaign_id', $campaignIds);
+            })
             ->pluck('id');
 
         // Shot stats
@@ -30,8 +34,8 @@ class IntelligenceService
         $shotsWithRender  = DB::table('shots')->whereIn('id', $shotIds)->whereNotNull('approved_render_id')->count();
         $shotsWithPrompt  = DB::table('prompts')->whereIn('shot_id', $shotIds)->where('is_active', true)->distinct('shot_id')->count();
 
-        // Render stats
-        $renders      = Render::whereIn('shot_id', $shotIds)->get();
+        // Render stats (excluye preview renders sin shot)
+        $renders      = Render::whereIn('shot_id', $shotIds)->whereNotNull('shot_id')->get();
         $totalRenders = $renders->count();
         $approved     = $renders->where('is_approved', true)->count();
         $failed       = $renders->where('status', 'failed')->count();
