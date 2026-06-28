@@ -209,7 +209,9 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
 
     // Script Generator
     Route::post('/episodes/{episode}/generate-script', [ScriptGeneratorController::class, 'generateScript'])->name('episodes.generate-script');
+    Route::get('/episodes/{episode}/generate-script/status', [ScriptGeneratorController::class, 'scriptStatus'])->name('episodes.generate-script.status');
     Route::post('/episodes/{episode}/generate-book-chapter', [ScriptGeneratorController::class, 'generateBookChapter'])->name('episodes.generate-book-chapter');
+    Route::get('/episodes/{episode}/generate-book-chapter/status', [ScriptGeneratorController::class, 'chapterStatus'])->name('episodes.generate-book-chapter.status');
     Route::post('/episodes/{episode}/continuity-check', [ScriptGeneratorController::class, 'checkContinuity'])->name('episodes.continuity-check');
 
     // Audio Studio

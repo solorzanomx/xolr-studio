@@ -173,7 +173,7 @@ PROMPT;
             'x-api-key'         => config('services.anthropic.key'),
             'anthropic-version' => '2023-06-01',
             'content-type'      => 'application/json',
-        ])->timeout(90)->post('https://api.anthropic.com/v1/messages', [
+        ])->timeout(270)->post('https://api.anthropic.com/v1/messages', [
             'model'      => config('services.anthropic.model'),
             'max_tokens' => $maxTokens,
             'messages'   => [

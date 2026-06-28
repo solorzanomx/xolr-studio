@@ -54,6 +54,9 @@ function csrfToken() {
     return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? ''
 }
 
+let scriptPollTimer   = null
+let chapterPollTimer  = null
+
 async function generateScript() {
     aiGenerating.value = 'script'
     aiError.value      = ''
@@ -77,17 +80,43 @@ async function generateScript() {
         })
         const data = await res.json()
 
-        if (data.ok && data.script) {
-            editor.value?.commands.setContent(data.script)
-            saveStatus.value = 'saved'
+        if (data.ok && data.queued) {
+            pollScriptStatus()
         } else {
             aiError.value = data.message ?? 'Error al generar el script'
+            aiGenerating.value = null
         }
     } catch (e) {
         aiError.value = 'Error de conexión al generar el script'
-    } finally {
         aiGenerating.value = null
     }
+}
+
+function pollScriptStatus() {
+    if (scriptPollTimer) clearInterval(scriptPollTimer)
+    scriptPollTimer = setInterval(async () => {
+        try {
+            const res  = await fetch(`/episodes/${props.episode.id}/generate-script/status`, {
+                headers: { 'Accept': 'application/json' },
+            })
+            const data = await res.json()
+
+            if (data.status === 'completed' && data.result) {
+                clearInterval(scriptPollTimer)
+                scriptPollTimer = null
+                editor.value?.commands.setContent(data.result)
+                saveStatus.value   = 'saved'
+                aiGenerating.value = null
+            } else if (data.status === 'failed') {
+                clearInterval(scriptPollTimer)
+                scriptPollTimer = null
+                aiError.value      = data.error ?? 'Error al generar el script'
+                aiGenerating.value = null
+            }
+        } catch (e) {
+            // red blip — seguir intentando
+        }
+    }, 3000)
 }
 
 async function generateBookChapter() {
@@ -102,17 +131,43 @@ async function generateBookChapter() {
         })
         const data = await res.json()
 
-        if (data.ok && data.chapter) {
-            chapterResult.value = data.chapter
-            showChapter.value   = true
+        if (data.ok && data.queued) {
+            pollChapterStatus()
         } else {
             aiError.value = data.message ?? 'Error al generar el capítulo'
+            aiGenerating.value = null
         }
     } catch (e) {
         aiError.value = 'Error de conexión al generar el capítulo'
-    } finally {
         aiGenerating.value = null
     }
+}
+
+function pollChapterStatus() {
+    if (chapterPollTimer) clearInterval(chapterPollTimer)
+    chapterPollTimer = setInterval(async () => {
+        try {
+            const res  = await fetch(`/episodes/${props.episode.id}/generate-book-chapter/status`, {
+                headers: { 'Accept': 'application/json' },
+            })
+            const data = await res.json()
+
+            if (data.status === 'completed' && data.result) {
+                clearInterval(chapterPollTimer)
+                chapterPollTimer = null
+                chapterResult.value = data.result
+                showChapter.value   = true
+                aiGenerating.value  = null
+            } else if (data.status === 'failed') {
+                clearInterval(chapterPollTimer)
+                chapterPollTimer = null
+                aiError.value      = data.error ?? 'Error al generar el capítulo'
+                aiGenerating.value = null
+            }
+        } catch (e) {
+            // red blip — seguir intentando
+        }
+    }, 3000)
 }
 
 async function checkContinuity() {
@@ -180,6 +235,8 @@ periodicTimer = setInterval(() => {
 onBeforeUnmount(() => {
     clearTimeout(autoSaveTimer)
     clearInterval(periodicTimer)
+    clearInterval(scriptPollTimer)
+    clearInterval(chapterPollTimer)
     editor.value?.destroy()
 })
 
