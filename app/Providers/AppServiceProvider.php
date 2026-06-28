@@ -11,6 +11,7 @@ use App\Services\Audio\ElevenLabsAdapter;
 use App\Services\Audio\MusicServiceContract;
 use App\Services\Audio\SubtitleService;
 use App\Services\Audio\SunoAdapter;
+use App\Services\RenderFarm\ComfyUIAdapter;
 use App\Services\RenderFarm\RenderFarmContract;
 use App\Services\RenderFarm\RunPodAdapter;
 use Illuminate\Support\Facades\Vite;
@@ -40,7 +41,15 @@ class AppServiceProvider extends ServiceProvider
             mockMode:  config('services.openai.mock_mode', false),
         ));
 
-        $this->app->singleton(RenderFarmContract::class, function (): RunPodAdapter {
+        $this->app->singleton(RenderFarmContract::class, function (): RenderFarmContract {
+            if (config('services.comfyui.base_url')) {
+                return new ComfyUIAdapter(
+                    baseUrl:  config('services.comfyui.base_url'),
+                    models:   config('services.comfyui.models', []),
+                    mockMode: config('services.comfyui.mock_mode', false),
+                );
+            }
+
             return new RunPodAdapter(
                 apiKey:        config('services.runpod.api_key', ''),
                 endpoints:     config('services.runpod.endpoints', []),

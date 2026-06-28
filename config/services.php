@@ -63,6 +63,17 @@ return [
         'mock_mode' => (bool) env('OPENAI_MOCK_MODE', false),
     ],
 
+    'comfyui' => [
+        'base_url'  => env('COMFYUI_BASE_URL', ''),
+        'mock_mode' => (bool) env('COMFYUI_MOCK_MODE', false),
+        'models'    => [
+            'dev'     => env('COMFYUI_MODEL_DEV',     'flux1-dev-fp8.safetensors'),
+            'clip_l'  => env('COMFYUI_MODEL_CLIP_L',  'clip_l.safetensors'),
+            'clip_t5' => env('COMFYUI_MODEL_CLIP_T5', 't5xxl_fp8_e4m3fn.safetensors'),
+            'vae'     => env('COMFYUI_MODEL_VAE',      'ae.safetensors'),
+        ],
+    ],
+
     'runpod' => [
         'api_key'        => env('RUNPOD_API_KEY'),
         'webhook_secret' => env('RUNPOD_WEBHOOK_SECRET'),
