@@ -277,6 +277,13 @@ const timeLabel = {
     morning:'Mañana', day:'Día', golden_hour:'Hora dorada', night:'Noche', unspecified:'Sin especificar',
 }
 const shotTypeIcon = { image: Image, video: Video, talking: Mic }
+
+function shotRenderUrl(shot) {
+    const render = shot.approved_render ?? shot.renders?.[0]
+    if (!render?.file_path) return null
+    const p = render.file_path
+    return p.startsWith('http') ? p : `/storage/${p}`
+}
 const shotStatusColor = {
     draft:'text-text-muted', prompt_ready:'text-info', rendering:'text-violet',
     audio_pending:'text-warning', lip_sync_pending:'text-warning',
@@ -667,38 +674,73 @@ const epStatusLabel = {
                     </div>
 
                     <!-- Shots grid -->
-                    <div class="p-3">
-                        <div v-if="!scene.shots?.length" class="text-center py-4 text-xs text-text-muted">
+                    <div class="p-4">
+                        <div v-if="!scene.shots?.length" class="text-center py-8 text-xs text-text-muted">
                             Sin shots — click "+ shot" para añadir
                         </div>
-                        <div v-else class="flex gap-2 overflow-x-auto pb-1">
+                        <div v-else class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
                             <div
                                 v-for="shot in scene.shots"
                                 :key="shot.id"
-                                :class="['shrink-0 w-36 bg-surface-2 border rounded-lg p-2.5 relative group transition-colors', editingShot === shot.id ? 'border-amber' : 'border-border']"
+                                :class="['bg-surface-2 border rounded-xl overflow-hidden relative group transition-all hover:border-amber/40', editingShot === shot.id ? 'border-amber' : 'border-border']"
                             >
-                                <div class="flex items-center justify-between mb-1.5">
-                                    <span class="text-[10px] font-mono text-amber">S{{ String(shot.number).padStart(2, '0') }}</span>
-                                    <div class="flex items-center gap-1">
-                                        <component :is="shotTypeIcon[shot.shot_type]" class="w-3 h-3 text-text-muted" />
-                                        <span :class="['w-1.5 h-1.5 rounded-full bg-current', shotStatusColor[shot.status]]" />
+                                <!-- Imagen del render -->
+                                <div class="relative aspect-video bg-surface-3 overflow-hidden">
+                                    <img
+                                        v-if="shotRenderUrl(shot)"
+                                        :src="shotRenderUrl(shot)"
+                                        :alt="`Shot ${shot.number}`"
+                                        class="w-full h-full object-cover"
+                                    />
+                                    <div v-else class="w-full h-full flex flex-col items-center justify-center gap-1.5">
+                                        <component :is="shotTypeIcon[shot.shot_type]" class="w-5 h-5 text-text-muted/40" />
+                                        <span class="text-[9px] text-text-muted/40 font-mono uppercase">Sin render</span>
+                                    </div>
+
+                                    <!-- Número de shot overlay -->
+                                    <div class="absolute top-1.5 left-1.5">
+                                        <span class="text-[10px] font-mono font-bold text-white bg-black/60 backdrop-blur-sm px-1.5 py-0.5 rounded">
+                                            S{{ String(shot.number).padStart(2, '0') }}
+                                        </span>
+                                    </div>
+
+                                    <!-- Status dot -->
+                                    <div class="absolute top-1.5 right-1.5">
+                                        <span :class="['w-2 h-2 rounded-full block ring-1 ring-black/30', {
+                                            'bg-text-muted': shot.status === 'draft',
+                                            'bg-info': shot.status === 'prompt_ready',
+                                            'bg-violet animate-pulse': shot.status === 'rendering',
+                                            'bg-warning': ['audio_pending','lip_sync_pending'].includes(shot.status),
+                                            'bg-success': shot.status === 'completed',
+                                            'bg-amber': shot.status === 'approved',
+                                        }]" :title="shot.status" />
+                                    </div>
+
+                                    <!-- Tipo + duración overlay bottom -->
+                                    <div class="absolute bottom-0 inset-x-0 flex items-center justify-between px-1.5 py-1 bg-gradient-to-t from-black/70 to-transparent">
+                                        <component :is="shotTypeIcon[shot.shot_type]" class="w-3 h-3 text-white/70" />
+                                        <span v-if="shot.duration_seconds" class="text-[9px] font-mono text-white/60">{{ shot.duration_seconds }}s</span>
+                                    </div>
+
+                                    <!-- Hover actions overlay -->
+                                    <div class="absolute inset-0 bg-black/50 flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <Link :href="`/shots/${shot.id}`" class="p-1.5 bg-white/10 hover:bg-violet/60 text-white rounded-lg transition-colors backdrop-blur-sm" title="Abrir shot">
+                                            <Camera class="w-3.5 h-3.5" />
+                                        </Link>
+                                        <button @click="openEditShot(shot)" class="p-1.5 bg-white/10 hover:bg-amber/60 text-white rounded-lg transition-colors backdrop-blur-sm">
+                                            <Pencil class="w-3.5 h-3.5" />
+                                        </button>
+                                        <button @click="deleteShot(shot.id)" class="p-1.5 bg-white/10 hover:bg-danger/60 text-white rounded-lg transition-colors backdrop-blur-sm">
+                                            <Trash2 class="w-3.5 h-3.5" />
+                                        </button>
                                     </div>
                                 </div>
-                                <p class="text-[11px] text-text-secondary line-clamp-3 leading-tight">
-                                    {{ shot.description || shot.dialogue_text || shot.purpose }}
-                                </p>
-                                <span v-if="shot.duration_seconds" class="text-[9px] font-mono text-text-muted mt-1 block">{{ shot.duration_seconds }}s</span>
-                                <!-- Botones hover -->
-                                <div class="absolute top-1 right-1 flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <Link :href="`/shots/${shot.id}`" class="p-0.5 text-text-muted hover:text-violet transition-colors" title="Abrir shot">
-                                        <Camera class="w-3 h-3" />
-                                    </Link>
-                                    <button @click="openEditShot(shot)" class="p-0.5 text-text-muted hover:text-amber transition-colors">
-                                        <Pencil class="w-3 h-3" />
-                                    </button>
-                                    <button @click="deleteShot(shot.id)" class="p-0.5 text-text-muted hover:text-danger transition-colors">
-                                        <Trash2 class="w-3 h-3" />
-                                    </button>
+
+                                <!-- Info del shot -->
+                                <div class="p-2">
+                                    <p class="text-[11px] text-text-secondary line-clamp-2 leading-snug">
+                                        {{ shot.description || shot.dialogue_text || shot.purpose }}
+                                    </p>
                                 </div>
                             </div>
                         </div>

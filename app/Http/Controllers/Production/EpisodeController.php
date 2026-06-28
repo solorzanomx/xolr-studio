@@ -37,7 +37,10 @@ class EpisodeController extends Controller
             'season.project:id,name,slug',
             'scenes' => fn($q) => $q->with([
                 'location:id,name',
-                'shots' => fn($q) => $q->orderBy('sort_order')->orderBy('number'),
+                'shots' => fn($q) => $q->with([
+                    'approvedRender:id,file_path,width,height,quality_tier',
+                    'renders' => fn($q) => $q->where('status', 'completed')->latest()->limit(1),
+                ])->orderBy('sort_order')->orderBy('number'),
             ])->orderBy('sort_order')->orderBy('number'),
         ]);
 
