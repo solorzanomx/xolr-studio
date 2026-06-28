@@ -57,10 +57,17 @@ Escribe el script completo de este episodio. Incluye:
 - Gancho de apertura que enganche en los primeros 5 segundos
 - Cierre memorable
 
-Formato: guion cinematográfico estándar en español.
 Extensión: apropiada para el tipo de contenido (3-8 minutos de video aproximadamente).
 
-Responde SOLO con el script, sin explicaciones previas ni adicionales.
+FORMATO DE SALIDA — usa SOLO estas etiquetas HTML, sin markdown, sin backticks, sin explicaciones:
+- <h2>TÍTULO DEL ACTO</h2> para actos (FADE IN, ACT ONE, ACT TWO, etc.)
+- <h3>INT. LUGAR — MOMENTO</h3> para encabezados de escena
+- <p><strong>NOMBRE PERSONAJE</strong></p> para el nombre del personaje antes de su diálogo
+- <p><em>(acotación de actuación o dirección)</em></p> para acotaciones
+- <p>texto del diálogo</p> para el diálogo hablado
+- <p><em>Descripción de acción o ambiente.</em></p> para descripciones de escena
+
+Responde ÚNICAMENTE con el HTML del script, nada más.
 PROMPT;
 
         return $this->callClaude($prompt, 6000);

@@ -69,3 +69,63 @@
         background-clip: text;
     }
 }
+
+/* ── Script / Screenplay editor (TipTap ProseMirror) ─────────────── */
+.ProseMirror {
+    outline: none;
+    min-height: 20rem;
+    color: var(--color-text-primary);
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 0.875rem;
+    line-height: 1.7;
+}
+
+.ProseMirror p {
+    margin: 0.5rem 0;
+}
+
+/* Encabezados de acto: FADE IN, ACT ONE */
+.ProseMirror h2 {
+    font-family: var(--font-sans);
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--color-text-muted);
+    margin: 2rem 0 0.75rem;
+    padding-bottom: 0.4rem;
+    border-bottom: 1px solid var(--color-border);
+}
+
+/* Encabezados de escena: INT. LUGAR — MOMENTO */
+.ProseMirror h3 {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 0.85rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: var(--color-text-secondary);
+    margin: 1.5rem 0 0.5rem;
+    letter-spacing: 0.05em;
+}
+
+/* Nombre de personaje (bold) */
+.ProseMirror strong {
+    font-weight: 700;
+    color: var(--color-text-primary);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+/* Acotaciones y descripciones de escena (italic) */
+.ProseMirror em {
+    font-style: italic;
+    color: var(--color-text-secondary);
+}
+
+/* Diálogo — sangría */
+.ProseMirror p:has(strong) + p:not(:has(em)):not(:has(strong)) {
+    padding-left: 2rem;
+    padding-right: 2rem;
+}
+
+.ProseMirror p:focus { outline: none; }
