@@ -177,8 +177,16 @@ class SettingsController extends Controller
 
         if (! $this->workerRunning()) {
             $artisan = base_path('artisan');
-            exec("nohup php {$artisan} queue:work --queue=renders,default --sleep=3 --tries=3 >> /var/log/xolrstudio-queue.log 2>&1 & echo \$!", $out);
-            sleep(1);
+            $cmd     = "nohup php {$artisan} queue:work --queue=renders,default --sleep=3 --tries=3 >> /var/log/xolrstudio-queue.log 2>&1 &";
+
+            if (function_exists('proc_open')) {
+                $desc = [['pipe', 'r'], ['pipe', 'w'], ['pipe', 'w']];
+                $proc = proc_open('bash -c ' . escapeshellarg($cmd), $desc, $pipes);
+                if (is_resource($proc)) {
+                    proc_close($proc);
+                    sleep(1);
+                }
+            }
         }
 
         return response()->json(['ok' => true, 'running' => $this->workerRunning()]);
@@ -188,8 +196,13 @@ class SettingsController extends Controller
 
     private function workerRunning(): bool
     {
-        exec('ps aux | grep "queue:work" | grep "xolrstudio" | grep -v grep 2>/dev/null', $lines);
-        return ! empty(array_filter($lines));
+        foreach (glob('/proc/*/cmdline') ?: [] as $file) {
+            $cmd = @file_get_contents($file);
+            if ($cmd && str_contains($cmd, 'queue:work') && str_contains($cmd, 'xolrstudio')) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private function writeEnvValue(string $key, string $value): void
