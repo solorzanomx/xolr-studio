@@ -7,7 +7,9 @@ namespace App\Http\Controllers\Production;
 use App\Http\Controllers\Controller;
 use App\Models\CameraStyle;
 use App\Models\Character;
+use App\Models\Episode;
 use App\Models\FormatPreset;
+use App\Models\Project;
 use App\Models\Prompt;
 use App\Models\Scene;
 use App\Models\Shot;
@@ -20,6 +22,73 @@ use Inertia\Response;
 
 class ShotController extends Controller
 {
+    public function index(Request $request): Response
+    {
+        $query = Shot::query()
+            ->with([
+                'approvedRender:id,file_path',
+                'scene.episode:id,title,number,season_id',
+                'scene.episode.season:id,project_id',
+                'scene.episode.season.project:id,name',
+                'campaign:id,name,project_id',
+                'campaign.project:id,name',
+                'videoConcept:id,title,video_series_id',
+            ])
+            ->orderByDesc('updated_at');
+
+        if ($search = $request->input('search')) {
+            $query->where('description', 'like', "%{$search}%");
+        }
+
+        if ($status = $request->input('status')) {
+            $query->where('status', $status);
+        }
+
+        if ($type = $request->input('type')) {
+            $query->where('shot_type', $type);
+        }
+
+        if ($projectId = $request->input('project_id')) {
+            $query->where(function ($q) use ($projectId): void {
+                $q->whereHas('scene.episode.season', fn($s) => $s->where('project_id', $projectId))
+                  ->orWhereHas('campaign', fn($c) => $c->where('project_id', $projectId));
+            });
+        }
+
+        $shots = $query->paginate(48)->withQueryString();
+
+        $shots->through(function (Shot $s): array {
+            $thumb = $s->approvedRender?->file_path;
+            $project = $s->scene?->episode?->season?->project
+                ?? $s->campaign?->project;
+            $context = $s->scene
+                ? "E{$s->scene->episode->number}: {$s->scene->episode->title}"
+                : ($s->campaign?->name ?? $s->videoConcept?->title ?? '—');
+
+            return [
+                'id'          => $s->id,
+                'number'      => $s->number,
+                'description' => $s->description,
+                'shot_type'   => $s->shot_type,
+                'status'      => $s->status,
+                'thumb'       => $thumb
+                    ? (str_starts_with($thumb, 'http') ? $thumb : "/storage/{$thumb}")
+                    : null,
+                'project'     => $project ? ['id' => $project->id, 'name' => $project->name] : null,
+                'context'     => $context,
+                'updated_at'  => $s->updated_at?->diffForHumans(),
+            ];
+        });
+
+        $projects = Project::orderBy('name')->get(['id', 'name']);
+
+        return Inertia::render('Shots/Index', [
+            'shots'    => $shots,
+            'projects' => $projects,
+            'filters'  => $request->only(['search', 'status', 'type', 'project_id']),
+        ]);
+    }
+
     public function show(Shot $shot): Response
     {
         $shot->load([

@@ -99,7 +99,7 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
     Route::delete('scenes/{scene}', [SceneController::class, 'destroy'])->name('scenes.destroy');
 
     // Shots
-    Route::get('shots', fn() => redirect('/projects'))->name('shots.index');
+    Route::get('shots', [ShotController::class, 'index'])->name('shots.index');
     Route::post('scenes/{scene}/shots', [ShotController::class, 'store'])->name('scenes.shots.store');
     Route::get('shots/{shot}', [ShotController::class, 'show'])->name('shots.show');
     Route::put('shots/{shot}', [ShotController::class, 'update'])->name('shots.update');
