@@ -70,7 +70,7 @@ FORMATO DE SALIDA — usa SOLO estas etiquetas HTML, sin markdown, sin backticks
 Responde ÚNICAMENTE con el HTML del script, nada más.
 PROMPT;
 
-        return $this->callClaude($prompt, 6000);
+        return $this->markdownToHtml($this->callClaude($prompt, 6000));
     }
 
     public function generateBookChapter(Episode $episode): string
@@ -186,6 +186,64 @@ PROMPT;
         }
 
         return $response->json('content.0.text', '');
+    }
+
+    private function markdownToHtml(string $text): string
+    {
+        // Si ya es HTML (Claude obedeció), lo devolvemos limpio
+        if (str_contains($text, '</p>') || str_contains($text, '</h')) {
+            return trim(preg_replace('/^```[a-z]*\n?|```\s*$/m', '', $text));
+        }
+
+        // Strip code fences y separadores decorativos
+        $text = preg_replace('/^```[a-z]*\n?/m', '', $text);
+        $text = preg_replace('/^```\s*$/m', '', $text);
+
+        $lines = preg_split('/\r?\n/', $text);
+        $html  = '';
+
+        foreach ($lines as $line) {
+            $line = trim($line);
+
+            if ($line === '' || preg_match('/^[-*_]{3,}$/', $line)) {
+                continue;
+            }
+
+            // ## Acto / FADE IN
+            if (preg_match('/^#{1,2}\s+(.+)$/', $line, $m)) {
+                $html .= '<h2>' . $this->inlineFormat($m[1]) . '</h2>';
+                continue;
+            }
+
+            // ### Encabezado de escena INT./EXT.
+            if (preg_match('/^###\s+(.+)$/', $line, $m)) {
+                $html .= '<h3>' . $this->inlineFormat($m[1]) . '</h3>';
+                continue;
+            }
+
+            // Línea completamente en mayúsculas y sin puntuación final → escena o personaje
+            if (preg_match('/^[A-ZÁÉÍÓÚÜÑ0-9 \/\.\(\)\-:\'\"]{4,}$/', $line) && ! str_ends_with($line, '.')) {
+                $html .= '<h3>' . $this->inlineFormat($line) . '</h3>';
+                continue;
+            }
+
+            $html .= '<p>' . $this->inlineFormat($line) . '</p>';
+        }
+
+        return $html ?: '<p></p>';
+    }
+
+    private function inlineFormat(string $text): string
+    {
+        $text = htmlspecialchars($text, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8', false);
+        // **bold**
+        $text = preg_replace('/\*\*(.+?)\*\*/s', '<strong>$1</strong>', $text);
+        // *(italic)*  or  *italic*
+        $text = preg_replace('/\*\((.+?)\)\*/s', '<em>($1)</em>', $text);
+        $text = preg_replace('/\*([^*\n]+?)\*/s', '<em>$1</em>', $text);
+        // `code` → plain
+        $text = preg_replace('/`([^`]+)`/', '$1', $text);
+        return $text;
     }
 
     private function stripMarkdown(string $text): string
