@@ -8,14 +8,18 @@ import {
 } from '@lucide/vue'
 
 const props = defineProps({
-    result:       Object,
-    characters:   Array,
-    cameraStyles: Array,
-    visualStyles: Array,
-    locations:    Array,
+    result:         Object,
+    previewRenders: Array,
+    characters:     Array,
+    cameraStyles:   Array,
+    visualStyles:   Array,
+    locations:      Array,
 })
 
-const expandedScenes = ref({})
+const expandedScenes  = ref({})
+const preRendering    = ref(false)
+const preRenderDone   = ref(false)
+const localRenders    = ref([...(props.previewRenders ?? [])])
 
 function toggleScene(index) {
     expandedScenes.value[index] = !expandedScenes.value[index]
@@ -25,6 +29,58 @@ function expandAll() {
     props.result.proposed_structure?.scenes?.forEach((_, i) => {
         expandedScenes.value[i] = true
     })
+}
+
+function shotRender(sceneIndex, shotIndex) {
+    return localRenders.value.find(r => r.scene_index === sceneIndex && r.shot_index === shotIndex)
+}
+
+function hasPreviewRenders() {
+    return localRenders.value.length > 0
+}
+
+function allRendersComplete() {
+    return localRenders.value.length > 0 && localRenders.value.every(r => ['completed', 'failed'].includes(r.status))
+}
+
+function csrfToken() {
+    return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? ''
+}
+
+async function preRenderAll() {
+    preRendering.value = true
+    try {
+        const res  = await fetch(`/ai-director/${props.result.id}/pre-render`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken(), 'Accept': 'application/json' },
+            body: JSON.stringify({}),
+        })
+        const data = await res.json()
+        if (data.ok) {
+            // Arranca polling para ver imágenes aparecer
+            pollRenders()
+        }
+    } catch (e) {
+        console.error(e)
+    } finally {
+        preRendering.value = false
+    }
+}
+
+let renderPollTimer = null
+
+function pollRenders() {
+    if (renderPollTimer) return
+    renderPollTimer = setInterval(() => {
+        router.reload({ only: ['previewRenders'], onSuccess: () => {
+            localRenders.value = [...(props.previewRenders ?? [])]
+            if (allRendersComplete()) {
+                clearInterval(renderPollTimer)
+                renderPollTimer = null
+                preRenderDone.value = true
+            }
+        }})
+    }, 4000)
 }
 
 // Polling cuando status es pending/processing
@@ -38,10 +94,17 @@ onMounted(() => {
         }, 4000)
     } else {
         expandAll()
+        // Si ya hay renders en progreso, retoma el polling
+        if (hasPreviewRenders() && !allRendersComplete()) {
+            pollRenders()
+        }
     }
 })
 
-onBeforeUnmount(() => clearInterval(pollTimer))
+onBeforeUnmount(() => {
+    clearInterval(pollTimer)
+    clearInterval(renderPollTimer)
+})
 
 // Para cuando cambie a completed, limpiar polling
 const isProcessing = computed(() => ['pending', 'processing'].includes(props.result.status))
@@ -161,6 +224,22 @@ const PURPOSE_COLORS = {
                             >
                                 <Trash2 class="w-4 h-4" />
                             </button>
+                            <!-- Pre-render si no hay renders aún -->
+                            <button
+                                v-if="!hasPreviewRenders()"
+                                @click="preRenderAll"
+                                :disabled="preRendering"
+                                class="flex items-center gap-1.5 px-4 py-2 bg-amber/10 text-amber text-sm font-semibold rounded-lg hover:bg-amber/20 disabled:opacity-50 transition-colors"
+                            >
+                                <Sparkles v-if="!preRendering" class="w-3.5 h-3.5" />
+                                <Loader v-else class="w-3.5 h-3.5 animate-spin" />
+                                {{ preRendering ? 'Enviando...' : 'Ver renders' }}
+                            </button>
+                            <!-- Spinner mientras renderizan -->
+                            <div v-else-if="hasPreviewRenders() && !allRendersComplete()" class="flex items-center gap-1.5 px-3 py-2 text-xs text-amber font-mono">
+                                <Loader class="w-3.5 h-3.5 animate-spin" />
+                                Renderizando...
+                            </div>
                             <button
                                 @click="applyStructure"
                                 class="flex items-center gap-1.5 px-4 py-2 bg-violet text-white text-sm font-semibold rounded-lg hover:bg-violet/90 transition-colors"
@@ -251,8 +330,36 @@ const PURPOSE_COLORS = {
                             <div
                                 v-for="(shot, shi) in scene.shots"
                                 :key="shi"
-                                class="bg-surface-0 border border-border rounded-lg p-3"
+                                class="bg-surface-0 border border-border rounded-lg overflow-hidden"
                             >
+                                <!-- Preview render image -->
+                                <div v-if="hasPreviewRenders()" class="relative w-full aspect-video bg-surface-2">
+                                    <!-- Completed: show image -->
+                                    <img
+                                        v-if="shotRender(si, shi)?.status === 'completed' && shotRender(si, shi)?.url"
+                                        :src="shotRender(si, shi).url"
+                                        :alt="shot.description"
+                                        class="w-full h-full object-cover"
+                                    />
+                                    <!-- Queued / processing: spinner -->
+                                    <div
+                                        v-else-if="['queued', 'processing'].includes(shotRender(si, shi)?.status)"
+                                        class="absolute inset-0 flex flex-col items-center justify-center gap-2"
+                                    >
+                                        <Loader class="w-5 h-5 text-amber animate-spin" />
+                                        <span class="text-[10px] font-mono text-text-muted">Renderizando...</span>
+                                    </div>
+                                    <!-- Failed or no render yet -->
+                                    <div v-else class="absolute inset-0 flex items-center justify-center">
+                                        <Image class="w-6 h-6 text-surface-3" />
+                                    </div>
+                                    <!-- Shot number badge -->
+                                    <span class="absolute top-1.5 left-1.5 text-[10px] font-mono bg-black/60 text-white px-1.5 py-0.5 rounded">
+                                        S{{ shot.number }}
+                                    </span>
+                                </div>
+
+                                <div class="p-3">
                                 <div class="flex items-start gap-3">
                                     <!-- Shot type icon -->
                                     <div class="flex items-center gap-1.5 shrink-0 pt-0.5">
@@ -261,7 +368,7 @@ const PURPOSE_COLORS = {
                                             class="w-3.5 h-3.5"
                                             :class="SHOT_TYPE_COLOR[shot.shot_type] ?? 'text-text-muted'"
                                         />
-                                        <span class="text-[10px] font-mono text-text-muted">S{{ shot.number }}</span>
+                                        <span v-if="!hasPreviewRenders()" class="text-[10px] font-mono text-text-muted">S{{ shot.number }}</span>
                                     </div>
 
                                     <div class="flex-1 min-w-0">
@@ -298,6 +405,7 @@ const PURPOSE_COLORS = {
                                         </p>
                                     </div>
                                 </div>
+                                </div><!-- /.p-3 -->
                             </div>
                         </div>
                     </div>

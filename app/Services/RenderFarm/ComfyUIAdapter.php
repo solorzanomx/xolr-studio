@@ -39,7 +39,9 @@ class ComfyUIAdapter implements RenderFarmContract
         $seed    = $render->seed ?? random_int(1, 999_999_999);
         $width   = $render->width  ?? $preset?->width  ?? 1024;
         $height  = $render->height ?? $preset?->height ?? 1024;
-        $text    = $render->prompt?->positive_prompt ?? '';
+        $text    = $render->prompt?->positive_prompt
+            ?? $render->metadata['positive_prompt']
+            ?? '';
 
         $workflow = $this->devWorkflow($text, $seed, $width, $height, $params['steps'], $params['guidance']);
 
@@ -183,7 +185,8 @@ class ComfyUIAdapter implements RenderFarmContract
             ]);
 
             if ($imgResponse->successful()) {
-                $path = "renders/{$render->shot_id}/{$render->id}.png";
+                $folder = $render->shot_id ? "renders/{$render->shot_id}" : 'renders/preview';
+                $path = "{$folder}/{$render->id}.png";
                 Storage::disk('public')->put($path, $imgResponse->body());
                 Log::info('ComfyUI: imagen guardada', ['path' => $path, 'render_id' => $render->id]);
                 return $path;

@@ -6,17 +6,21 @@ namespace App\Http\Controllers\Production;
 
 use App\Http\Controllers\Controller;
 use App\Jobs\ProcessAIDirectorJob;
+use App\Jobs\SubmitRenderJob;
 use App\Models\AIDirectorResult;
 use App\Models\CameraStyle;
 use App\Models\Character;
 use App\Models\Episode;
 use App\Models\Location;
+use App\Models\Render;
 use App\Models\Scene;
 use App\Models\Shot;
 use App\Models\VisualStyle;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -64,13 +68,77 @@ class AIDirectorController extends Controller
         $visualStyles = VisualStyle::where('is_active', true)->get(['id', 'name']);
         $locations    = Location::where('is_active', true)->get(['id', 'name']);
 
+        // Preview renders para esta propuesta
+        $previewRenders = Render::whereNull('shot_id')
+            ->where('metadata->ai_director_result_id', $aiDirectorResult->id)
+            ->get(['id', 'status', 'file_path', 'metadata'])
+            ->map(fn($r) => [
+                'id'          => $r->id,
+                'status'      => $r->status,
+                'scene_index' => $r->metadata['scene_index'] ?? null,
+                'shot_index'  => $r->metadata['shot_index']  ?? null,
+                'url'         => $r->file_path
+                    ? (str_starts_with($r->file_path, 'http')
+                        ? $r->file_path
+                        : Storage::disk('public')->url($r->file_path))
+                    : null,
+            ]);
+
         return Inertia::render('AIDirector/Show', [
-            'result'       => $aiDirectorResult,
-            'characters'   => $characters,
-            'cameraStyles' => $cameraStyles,
-            'visualStyles' => $visualStyles,
-            'locations'    => $locations,
+            'result'         => $aiDirectorResult,
+            'previewRenders' => $previewRenders,
+            'characters'     => $characters,
+            'cameraStyles'   => $cameraStyles,
+            'visualStyles'   => $visualStyles,
+            'locations'      => $locations,
         ]);
+    }
+
+    public function preRender(AIDirectorResult $aiDirectorResult): JsonResponse
+    {
+        if ($aiDirectorResult->status !== 'completed') {
+            return response()->json(['ok' => false, 'message' => 'La propuesta no está lista.'], 422);
+        }
+
+        // Cancela previews anteriores de este resultado
+        Render::whereNull('shot_id')
+            ->where('metadata->ai_director_result_id', $aiDirectorResult->id)
+            ->whereIn('status', ['queued', 'processing'])
+            ->update(['status' => 'cancelled']);
+
+        $structure = $aiDirectorResult->proposed_structure;
+        $dispatched = 0;
+
+        foreach ($structure['scenes'] as $si => $sceneData) {
+            foreach ($sceneData['shots'] as $shi => $shotData) {
+                $positivePrompt = trim(
+                    ($shotData['description'] ?? '')
+                    . (! empty($shotData['director_notes']) ? '. ' . $shotData['director_notes'] : '')
+                );
+
+                $render = Render::create([
+                    'shot_id'      => null,
+                    'prompt_id'    => null,
+                    'status'       => 'queued',
+                    'quality_tier' => 'draft',
+                    'gpu_service'  => 'runpod',
+                    'width'        => 1024,
+                    'height'       => 576,
+                    'metadata'     => [
+                        'preview'               => true,
+                        'ai_director_result_id' => $aiDirectorResult->id,
+                        'scene_index'           => $si,
+                        'shot_index'            => $shi,
+                        'positive_prompt'       => $positivePrompt,
+                    ],
+                ]);
+
+                SubmitRenderJob::dispatch($render)->onQueue('renders');
+                $dispatched++;
+            }
+        }
+
+        return response()->json(['ok' => true, 'dispatched' => $dispatched]);
     }
 
     public function apply(AIDirectorResult $aiDirectorResult): RedirectResponse
@@ -159,6 +227,20 @@ class AIDirectorController extends Controller
                             if ($char) {
                                 $shot->characters()->attach($char->id);
                             }
+                        }
+                    }
+
+                    // Linkear preview render si existe
+                    $previewRender = Render::whereNull('shot_id')
+                        ->where('metadata->ai_director_result_id', $aiDirectorResult->id)
+                        ->where('metadata->scene_index', $sceneSortOrder - 1)
+                        ->where('metadata->shot_index', array_search($shotData, $sceneData['shots']))
+                        ->first();
+
+                    if ($previewRender) {
+                        $previewRender->update(['shot_id' => $shot->id]);
+                        if ($previewRender->status === 'completed' && $previewRender->file_path) {
+                            $shot->update(['status' => 'completed', 'approved_render_id' => $previewRender->id]);
                         }
                     }
                 }

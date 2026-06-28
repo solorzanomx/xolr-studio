@@ -203,6 +203,7 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
     Route::get('/ai-director', [AIDirectorController::class, 'index'])->name('ai-director.index');
     Route::post('/episodes/{episode}/ai-director', [AIDirectorController::class, 'run'])->name('episodes.ai-director.run');
     Route::get('/ai-director/{aiDirectorResult}', [AIDirectorController::class, 'show'])->name('ai-director.show');
+    Route::post('/ai-director/{aiDirectorResult}/pre-render', [AIDirectorController::class, 'preRender'])->name('ai-director.pre-render');
     Route::post('/ai-director/{aiDirectorResult}/apply', [AIDirectorController::class, 'apply'])->name('ai-director.apply');
     Route::delete('/ai-director/{aiDirectorResult}', [AIDirectorController::class, 'destroy'])->name('ai-director.destroy');
 
