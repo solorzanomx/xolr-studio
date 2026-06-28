@@ -7,7 +7,7 @@ namespace App\Http\Controllers\Production;
 use App\Http\Controllers\Controller;
 use App\Models\Episode;
 use App\Services\ScriptGeneratorService;
-use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\JsonResponse;
 
 class ScriptGeneratorController extends Controller
 {
@@ -15,42 +15,37 @@ class ScriptGeneratorController extends Controller
         private readonly ScriptGeneratorService $service,
     ) {}
 
-    public function generateScript(Episode $episode): RedirectResponse
+    public function generateScript(Episode $episode): JsonResponse
     {
         try {
             $script = $this->service->generateScript($episode);
             $episode->update(['script' => $script]);
 
-            return redirect()->route('episodes.show', $episode)
-                ->with('success', 'Script generado por IA y guardado.');
+            return response()->json(['ok' => true, 'script' => $script]);
         } catch (\Throwable $e) {
-            return back()->withErrors(['script' => $e->getMessage()]);
+            return response()->json(['ok' => false, 'message' => $e->getMessage()], 500);
         }
     }
 
-    public function generateBookChapter(Episode $episode): RedirectResponse
+    public function generateBookChapter(Episode $episode): JsonResponse
     {
         try {
             $chapter = $this->service->generateBookChapter($episode);
 
-            return redirect()->route('episodes.show', $episode)
-                ->with('book_chapter', $chapter)
-                ->with('success', 'Capítulo de libro generado.');
+            return response()->json(['ok' => true, 'chapter' => $chapter]);
         } catch (\Throwable $e) {
-            return back()->withErrors(['chapter' => $e->getMessage()]);
+            return response()->json(['ok' => false, 'message' => $e->getMessage()], 500);
         }
     }
 
-    public function checkContinuity(Episode $episode): RedirectResponse
+    public function checkContinuity(Episode $episode): JsonResponse
     {
         try {
             $result = $this->service->checkContinuity($episode);
 
-            return redirect()->route('episodes.show', $episode)
-                ->with('continuity_result', $result)
-                ->with('success', 'Verificación de continuidad completada.');
+            return response()->json(['ok' => true, 'result' => $result]);
         } catch (\Throwable $e) {
-            return back()->withErrors(['continuity' => $e->getMessage()]);
+            return response()->json(['ok' => false, 'message' => $e->getMessage()], 500);
         }
     }
 }

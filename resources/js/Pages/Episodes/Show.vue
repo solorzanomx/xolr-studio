@@ -1,6 +1,6 @@
 <script setup>
 import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3'
-import { ref, computed, onBeforeUnmount } from 'vue'
+import { ref, computed, onBeforeUnmount, watch } from 'vue'
 import AppLayout from '@/Layouts/AppLayout.vue'
 import { ChevronLeft, Pencil, FileText, Camera, Plus, Trash2, Image, Video, Mic, Sparkles, BookOpen, CheckCheck, Wand2, X, AlertTriangle, Share2, Link2, Lock, Eye } from '@lucide/vue'
 import { useEditor, EditorContent } from '@tiptap/vue-3'
@@ -41,31 +41,103 @@ function copyLink(url) {
 const activeTab = ref('info')
 
 // ── Flash / AI results ─────────────────────────────────────────
-const page          = usePage()
-const flash         = computed(() => page.props.flash ?? {})
-const aiGenerating  = ref(null) // 'script' | 'chapter' | 'continuity'
-const showChapter   = ref(false)
+const page           = usePage()
+const flash          = computed(() => page.props.flash ?? {})
+const aiGenerating   = ref(null) // 'script' | 'chapter' | 'continuity'
+const showChapter    = ref(false)
 const showContinuity = ref(false)
+const aiError        = ref('')
+const chapterResult  = ref('')
+const continuityResult = ref(null)
 
-function generateScript() {
+function csrfToken() {
+    return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? ''
+}
+
+async function generateScript() {
     aiGenerating.value = 'script'
-    router.post(`/episodes/${props.episode.id}/generate-script`, {}, {
-        onFinish: () => { aiGenerating.value = null },
-    })
+    aiError.value      = ''
+
+    // Guarda el borrador actual antes de generar
+    if (saveStatus.value === 'unsaved') {
+        await new Promise((resolve) => {
+            scriptForm.script = editor.value?.getHTML() ?? ''
+            scriptForm.put(`/episodes/${props.episode.id}/script`, {
+                preserveState: true, preserveScroll: true,
+                onFinish: resolve,
+            })
+        })
+    }
+
+    try {
+        const res  = await fetch(`/episodes/${props.episode.id}/generate-script`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken(), 'Accept': 'application/json' },
+            body: JSON.stringify({}),
+        })
+        const data = await res.json()
+
+        if (data.ok && data.script) {
+            editor.value?.commands.setContent(data.script)
+            saveStatus.value = 'saved'
+        } else {
+            aiError.value = data.message ?? 'Error al generar el script'
+        }
+    } catch (e) {
+        aiError.value = 'Error de conexión al generar el script'
+    } finally {
+        aiGenerating.value = null
+    }
 }
 
-function generateBookChapter() {
+async function generateBookChapter() {
     aiGenerating.value = 'chapter'
-    router.post(`/episodes/${props.episode.id}/generate-book-chapter`, {}, {
-        onFinish: () => { aiGenerating.value = null; showChapter.value = true },
-    })
+    aiError.value      = ''
+
+    try {
+        const res  = await fetch(`/episodes/${props.episode.id}/generate-book-chapter`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken(), 'Accept': 'application/json' },
+            body: JSON.stringify({}),
+        })
+        const data = await res.json()
+
+        if (data.ok && data.chapter) {
+            chapterResult.value = data.chapter
+            showChapter.value   = true
+        } else {
+            aiError.value = data.message ?? 'Error al generar el capítulo'
+        }
+    } catch (e) {
+        aiError.value = 'Error de conexión al generar el capítulo'
+    } finally {
+        aiGenerating.value = null
+    }
 }
 
-function checkContinuity() {
+async function checkContinuity() {
     aiGenerating.value = 'continuity'
-    router.post(`/episodes/${props.episode.id}/continuity-check`, {}, {
-        onFinish: () => { aiGenerating.value = null; showContinuity.value = true },
-    })
+    aiError.value      = ''
+
+    try {
+        const res  = await fetch(`/episodes/${props.episode.id}/continuity-check`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken(), 'Accept': 'application/json' },
+            body: JSON.stringify({}),
+        })
+        const data = await res.json()
+
+        if (data.ok && data.result) {
+            continuityResult.value = data.result
+            showContinuity.value   = true
+        } else {
+            aiError.value = data.message ?? 'Error al verificar continuidad'
+        }
+    } catch (e) {
+        aiError.value = 'Error de conexión al verificar continuidad'
+    } finally {
+        aiGenerating.value = null
+    }
 }
 
 // ── Script editor ──────────────────────────────────────────────
@@ -352,10 +424,19 @@ const epStatusLabel = {
                         {{ aiGenerating === 'continuity' ? 'Analizando...' : 'Verificar continuidad' }}
                     </button>
                 </div>
+
+                <!-- AI error banner -->
+                <div v-if="aiError" class="mt-3 flex items-start gap-2 px-3 py-2.5 bg-danger/10 border border-danger/20 rounded-lg text-xs text-danger">
+                    <AlertTriangle class="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                    <span>{{ aiError }}</span>
+                    <button @click="aiError = ''" class="ml-auto shrink-0 opacity-60 hover:opacity-100">
+                        <X class="w-3 h-3" />
+                    </button>
+                </div>
             </div>
 
             <!-- Book chapter result -->
-            <div v-if="showChapter && flash.book_chapter" class="mt-4 bg-surface-1 border border-border rounded-xl">
+            <div v-if="showChapter && chapterResult" class="mt-4 bg-surface-1 border border-border rounded-xl">
                 <div class="flex items-center justify-between p-4 border-b border-border">
                     <div class="flex items-center gap-2">
                         <BookOpen class="w-4 h-4 text-amber" />
@@ -366,12 +447,12 @@ const epStatusLabel = {
                     </button>
                 </div>
                 <div class="p-4 max-h-80 overflow-y-auto">
-                    <pre class="text-xs text-text-secondary whitespace-pre-wrap font-sans leading-relaxed">{{ flash.book_chapter }}</pre>
+                    <pre class="text-xs text-text-secondary whitespace-pre-wrap font-sans leading-relaxed">{{ chapterResult }}</pre>
                 </div>
             </div>
 
             <!-- Continuity check result -->
-            <div v-if="showContinuity && flash.continuity_result" class="mt-4 bg-surface-1 border border-border rounded-xl">
+            <div v-if="showContinuity && continuityResult" class="mt-4 bg-surface-1 border border-border rounded-xl">
                 <div class="flex items-center justify-between p-4 border-b border-border">
                     <div class="flex items-center gap-2">
                         <CheckCheck class="w-4 h-4 text-violet" />
@@ -382,13 +463,13 @@ const epStatusLabel = {
                     </button>
                 </div>
                 <div class="p-4 space-y-3">
-                    <div v-if="!flash.continuity_result.has_issues" class="flex items-center gap-2 text-sm text-evergreen">
+                    <div v-if="!continuityResult.has_issues" class="flex items-center gap-2 text-sm text-evergreen">
                         <CheckCheck class="w-4 h-4" />
                         Sin problemas de continuidad detectados.
                     </div>
                     <div v-else>
                         <div
-                            v-for="issue in flash.continuity_result.issues"
+                            v-for="issue in continuityResult.issues"
                             :key="issue.description"
                             class="flex gap-2 text-xs p-3 bg-danger/5 border border-danger/20 rounded-lg mb-2"
                         >
@@ -400,9 +481,9 @@ const epStatusLabel = {
                             </div>
                         </div>
                     </div>
-                    <div v-if="flash.continuity_result.suggestions?.length" class="space-y-1">
+                    <div v-if="continuityResult.suggestions?.length" class="space-y-1">
                         <p class="text-[10px] text-text-muted uppercase tracking-wider">Sugerencias</p>
-                        <p v-for="s in flash.continuity_result.suggestions" :key="s" class="text-xs text-text-secondary">• {{ s }}</p>
+                        <p v-for="s in continuityResult.suggestions" :key="s" class="text-xs text-text-secondary">• {{ s }}</p>
                     </div>
                 </div>
             </div>

@@ -27,10 +27,19 @@ class ScriptGeneratorService
             ->map(fn($e) => "E{$e->number} - {$e->title}: {$e->logline}")
             ->join("\n");
 
+        $draft = trim(strip_tags($episode->script ?? ''));
+
+        $draftSection = $draft
+            ? "\n\nBORRADOR / NOTAS DEL AUTOR (usa esto como materia prima — desarrolla, expande y transforma en un guion cinematográfico completo, dale estructura, ganchos y tensión dramática):\n{$draft}"
+            : '';
+
+        $logline  = $episode->logline  ? "\nLogline: {$episode->logline}"   : '';
+        $synopsis = $episode->synopsis ? "\nSinopsis: {$episode->synopsis}" : '';
+
         $prompt = <<<PROMPT
 Eres un guionista profesional para producciones audiovisuales y redes sociales.
 
-PROYECTO: {$project->name}
+PROYECTO: {$project->name}{$logline}{$synopsis}
 
 UNIVERSE BIBLE:
 {$universeNotes}
@@ -38,20 +47,20 @@ UNIVERSE BIBLE:
 EPISODIOS PREVIOS:
 {$previousEpisodes}
 
-EPISODIO #{$episode->number}: {$episode->title}
-Logline: {$episode->logline}
-Sinopsis: {$episode->synopsis}
+EPISODIO #{$episode->number}: {$episode->title}{$draftSection}
 
 Escribe el script completo de este episodio. Incluye:
-- Descripciones de escena (ACTION)
-- Diálogos completos
+- Descripciones de escena (ACTION) vívidas y cinematográficas
+- Diálogos naturales y con carácter propio
 - Transiciones
-- Notas de dirección en paréntesis
+- Notas de dirección en paréntesis cuando aporten valor
+- Gancho de apertura que enganche en los primeros 5 segundos
+- Cierre memorable
 
 Formato: guion cinematográfico estándar en español.
 Extensión: apropiada para el tipo de contenido (3-8 minutos de video aproximadamente).
 
-Responde SOLO con el script, sin explicaciones adicionales.
+Responde SOLO con el script, sin explicaciones previas ni adicionales.
 PROMPT;
 
         return $this->callClaude($prompt, 6000);
