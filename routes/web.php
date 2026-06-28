@@ -27,6 +27,7 @@ use App\Http\Controllers\Production\TalkingRenderController;
 use App\Http\Controllers\Production\AIDirectorController;
 use App\Http\Controllers\Production\ScriptGeneratorController;
 use App\Http\Controllers\Intelligence\IntelligenceController;
+use App\Http\Controllers\Historia\HistoriaController;
 use App\Http\Controllers\Publishing\ExportController;
 use App\Http\Controllers\Publishing\PrintController;
 use App\Http\Controllers\Budget\BudgetController;
@@ -206,6 +207,28 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
     Route::post('/ai-director/{aiDirectorResult}/pre-render', [AIDirectorController::class, 'preRender'])->name('ai-director.pre-render');
     Route::post('/ai-director/{aiDirectorResult}/apply', [AIDirectorController::class, 'apply'])->name('ai-director.apply');
     Route::delete('/ai-director/{aiDirectorResult}', [AIDirectorController::class, 'destroy'])->name('ai-director.destroy');
+
+    // Historia (Libro + Serie)
+    Route::get('/historia', [HistoriaController::class, 'index'])->name('historia.index');
+    Route::put('/historia', [HistoriaController::class, 'updateBook'])->name('historia.update');
+    Route::post('/historia/ideas', [HistoriaController::class, 'storeIdea'])->name('historia.ideas.store');
+    Route::delete('/historia/ideas/{bookIdea}', [HistoriaController::class, 'destroyIdea'])->name('historia.ideas.destroy');
+    Route::post('/historia/organize', [HistoriaController::class, 'organizeIdeas'])->name('historia.organize');
+    Route::get('/historia/organize/status', [HistoriaController::class, 'organizeStatus'])->name('historia.organize.status');
+    Route::post('/historia/capitulos', [HistoriaController::class, 'storeChapter'])->name('historia.chapters.store');
+    Route::post('/historia/capitulos/reorder', [HistoriaController::class, 'reorderChapters'])->name('historia.chapters.reorder');
+    Route::get('/historia/capitulos/{bookChapter}', [HistoriaController::class, 'showChapter'])->name('historia.chapters.show');
+    Route::put('/historia/capitulos/{bookChapter}', [HistoriaController::class, 'updateChapter'])->name('historia.chapters.update');
+    Route::delete('/historia/capitulos/{bookChapter}', [HistoriaController::class, 'destroyChapter'])->name('historia.chapters.destroy');
+    Route::post('/historia/capitulos/{bookChapter}/expand', [HistoriaController::class, 'expandChapter'])->name('historia.chapters.expand');
+    Route::get('/historia/capitulos/{bookChapter}/expand/status', [HistoriaController::class, 'expandStatus'])->name('historia.chapters.expand.status');
+    Route::post('/historia/capitulos/{bookChapter}/market-intel', [HistoriaController::class, 'marketIntel'])->name('historia.chapters.market');
+    Route::get('/historia/capitulos/{bookChapter}/market-intel/status', [HistoriaController::class, 'marketStatus'])->name('historia.chapters.market.status');
+    Route::post('/historia/capitulos/{bookChapter}/interlinking', [HistoriaController::class, 'generateInterlinking'])->name('historia.chapters.interlinking');
+    Route::post('/historia/capitulos/{bookChapter}/suggest-clues', [HistoriaController::class, 'suggestClues'])->name('historia.chapters.suggest-clues');
+    Route::post('/historia/capitulos/{bookChapter}/clues', [HistoriaController::class, 'storeClue'])->name('historia.clues.store');
+    Route::put('/historia/clues/{bookClue}', [HistoriaController::class, 'updateClue'])->name('historia.clues.update');
+    Route::delete('/historia/clues/{bookClue}', [HistoriaController::class, 'destroyClue'])->name('historia.clues.destroy');
 
     // Script Generator
     Route::post('/episodes/{episode}/generate-script', [ScriptGeneratorController::class, 'generateScript'])->name('episodes.generate-script');

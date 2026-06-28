@@ -31,6 +31,7 @@ const navSections = [
             { label: 'Proyectos', href: '/projects', icon: 'folder' },
             { label: 'Campañas', href: '/campaigns', icon: 'megaphone' },
             { label: 'Content Machine', href: '/content-machine', icon: 'lightbulb' },
+            { label: 'Historia', href: '/historia', icon: 'book-open' },
             { label: 'Shots', href: '/shots', icon: 'camera' },
             { label: 'Renders', href: '/renders', icon: 'image' },
             { label: 'Budget', href: '/budget', icon: 'dollar-sign' },
